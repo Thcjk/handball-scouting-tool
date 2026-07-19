@@ -8,6 +8,7 @@ import { GameModule } from './game/game.module';
 import { DynastyModule } from './dynasty/dynasty.module';
 import { DiplomacyModule } from './diplomacy/diplomacy.module';
 import { TickModule } from './tick/tick.module';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [
@@ -21,5 +22,6 @@ import { TickModule } from './tick/tick.module';
     TickModule,
     GameModule,
   ],
+  controllers: [AppController],
 })
 export class AppModule {}

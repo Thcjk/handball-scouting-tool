@@ -1,0 +1,21 @@
+# Render.com – kostenloser Cloud-Host (ein Link für alles)
+# Einmalig einrichten, danach läuft das Spiel dauerhaft online.
+
+services:
+  - type: web
+    name: kronenchronik
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install && npm run build:prod
+    startCommand: bash scripts/render-start.sh
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d

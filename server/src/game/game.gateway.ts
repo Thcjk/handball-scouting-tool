@@ -10,7 +10,7 @@ import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+    origin: process.env.NODE_ENV === 'production' ? true : (process.env.CORS_ORIGIN ?? 'http://localhost:5173'),
     credentials: true,
   },
   namespace: '/game',
