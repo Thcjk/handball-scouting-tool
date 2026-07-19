@@ -20,6 +20,17 @@ Das war's – registriere dich und spiele!
 
 > **Hinweis:** Codespaces ist kostenlos mit monatlichem Kontingent (ca. 60 Std./Monat im Free-Tier). Danach pausiert der Codespace automatisch.
 
+## Roadmap
+
+| Phase | Was | Wann |
+|-------|-----|------|
+| **1 – Jetzt** | Spielen über GitHub Codespaces | ✅ aktiv |
+| **2** | Feste Web-URL (Vercel + Railway o.ä.) | Wenn MVP stabil ist |
+| **3** | PWA – „Zum Startbildschirm hinzufügen“ auf dem Handy | Mit Phase 2 |
+| **4** | Native App (App Store / Play Store via Capacitor) | Wenn das Spiel fertig ist |
+
+Details: [docs/roadmap.md](docs/roadmap.md)
+
 ## Lokal starten (optional)
 
 
