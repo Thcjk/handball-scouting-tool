@@ -1,10 +1,12 @@
+# CI läuft nur bei Pull Requests (nicht bei jedem Push auf main).
+# So gibt es weniger E-Mail-Benachrichtigungen von GitHub Actions.
+
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -34,7 +36,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Lint
         run: npm run lint
@@ -44,6 +46,9 @@ jobs:
 
       - name: Build shared
         run: npm run build -w shared
+
+      - name: Build client (GitHub Pages)
+        run: npm run build:pages -w client
 
       - name: Generate Prisma client
         run: npm run db:generate
@@ -55,13 +60,5 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kronenchronik?schema=public
 
-      - name: Seed database
-        run: npm run db:seed
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kronenchronik?schema=public
-
       - name: Build server
         run: npm run build -w server
-
-      - name: Build client
-        run: npm run build -w client
