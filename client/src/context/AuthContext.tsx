@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { api, type User } from '../api/client';
+import { api, type User, isOfflineMode } from '../api/client';
+import { localLogout } from '../local/localApi';
 
 interface AuthContextType {
   user: User | null;
@@ -22,6 +23,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loadUser = useCallback(async () => {
+    if (isOfflineMode) {
+      const session = localStorage.getItem('kronenchronik_session');
+      if (!session) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const me = await api.getMe();
+        setUser(me);
+      } catch {
+        localLogout();
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     const token = localStorage.getItem('token');
     if (!token) {
       setLoading(false);
@@ -60,7 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    if (isOfflineMode) {
+      localLogout();
+    } else {
+      localStorage.removeItem('token');
+    }
     setUser(null);
   };
 

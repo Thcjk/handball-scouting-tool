@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { api, type GameState, type Province, type BattleResult } from '../api/client';
+import { api, type GameState, type Province, type BattleResult, isOfflineMode } from '../api/client';
+import { applyResourceTick } from '../local/localApi';
 import { useGameSocket } from '../hooks/useGameSocket';
 import ResourceBar from '../components/ResourceBar';
 import WorldMap from '../components/WorldMap';
@@ -32,6 +33,18 @@ export default function GamePage() {
   useEffect(() => {
     loadGame();
   }, [loadGame]);
+
+  // Offline: Ressourcen-Ticks alle 30 Sekunden
+  useEffect(() => {
+    if (!isOfflineMode) return;
+    const id = setInterval(() => {
+      const session = localStorage.getItem('kronenchronik_session');
+      if (!session) return;
+      const state = applyResourceTick(session);
+      if (state) setGameState(state);
+    }, 30000);
+    return () => clearInterval(id);
+  }, []);
 
   useGameSocket({
     onGameStateUpdate: (state) => setGameState(state),

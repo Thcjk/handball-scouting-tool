@@ -1,4 +1,5 @@
-import { UnitDefinition, UnitType } from './types';
+import type { UnitDefinition } from './types';
+import { UnitType } from './types';
 
 export const UNIT_DEFINITIONS: Record<UnitType, UnitDefinition> = {
   [UnitType.MILITIA]: {

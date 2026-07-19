@@ -1,4 +1,5 @@
-import { BattleInput, BattleResult, BattleRound, BattleUnitInput, Terrain } from './types';
+import type { BattleInput, BattleResult, BattleRound, BattleUnitInput } from './types';
+import { Terrain } from './types';
 import { TERRAIN_DEFENSE_BONUS, CASTLE_DEFENSE_PER_LEVEL } from './constants';
 import { getUnitPower, UNIT_DEFINITIONS } from './units';
 

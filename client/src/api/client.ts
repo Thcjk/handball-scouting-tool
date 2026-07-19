@@ -1,3 +1,5 @@
+const OFFLINE_MODE = import.meta.env.VITE_OFFLINE_MODE === 'true';
+
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 class ApiError extends Error {
@@ -27,7 +29,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return res.json();
 }
 
-export const api = {
+const remoteApi = {
   register: (data: {
     email: string;
     username: string;
@@ -103,6 +105,12 @@ export const api = {
       body: JSON.stringify({ targetKingdomId }),
     }),
 };
+
+import { localApi } from '../local/localApi';
+
+export const api = OFFLINE_MODE ? localApi : remoteApi;
+
+export const isOfflineMode = OFFLINE_MODE;
 
 export interface User {
   id: string;

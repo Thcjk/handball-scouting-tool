@@ -1,32 +1,32 @@
 # Kronenchronik
 
-Browserbasiertes Mittelalter-Strategiespiel.
+Browserbasiertes Mittelalter-Strategiespiel – direkt im Browser spielen, Fortschritt wird lokal gespeichert.
 
-## Jetzt spielen (ein Link, kostenlos)
+## Jetzt spielen
 
-### Spiel-URL
-**https://kronenchronik.onrender.com**
-
-### GitHub-Link (leitet weiter)
 **https://thcjk.github.io/Kronenchronik/**
 
-Einfach Link öffnen → registrieren → spielen. Keine Installation, nichts lokal speichern.
+1. Link öffnen
+2. Einmal registrieren (E-Mail, Passwort, Königreichsname)
+3. Spielen – dein Fortschritt wird **automatisch im Browser gespeichert**
+4. Beim nächsten Besuch einfach wieder einloggen und weiterspielen
 
-> Beim ersten Aufruf nach Inaktivität kann der Server ~30 Sek. brauchen (Render Free Tier).
-
----
-
-## Noch nicht online?
-
-Falls der Link noch nicht funktioniert, muss das Spiel **einmalig** kostenlos in der Cloud eingerichtet werden (ca. 10 Min., nur für den Repository-Besitzer):
-
-👉 **[Anleitung: docs/EINRICHTUNG.md](docs/EINRICHTUNG.md)**
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Thcjk/Kronenchronik)
+> Kein Server, keine Installation, keine Kosten. Der Spielstand liegt nur auf deinem Gerät (localStorage). Browser-Daten löschen = Spielstand weg.
 
 ---
 
-## Entwicklung (optional, nur für Programmierer)
+## Features
+
+- Registrierung & Login (lokal im Browser)
+- Weltkarte mit 17 Provinzen
+- Burgen, Gebäude, Armeen, Schlachten
+- Städte gründen und ausbauen
+- Dynastien & Ressourcen-Ticks
+- Automatisches Speichern nach jeder Aktion
+
+---
+
+## Entwicklung (optional)
 
 ```bash
 npm install && cp .env.example .env
@@ -34,31 +34,23 @@ npm run db:generate && npm run db:push && npm run db:seed
 npm run dev
 ```
 
-Oder GitHub Codespaces (nur für Entwicklung, nicht zum Spielen empfohlen).
+Für den Online-Modus mit Server (NestJS + PostgreSQL) siehe [docs/EINRICHTUNG.md](docs/EINRICHTUNG.md).
+
+GitHub Pages Build lokal testen:
+
+```bash
+npm run build:pages -w client
+```
 
 ## Tech-Stack
 
 | Bereich | Technologie |
 |---------|-------------|
 | Frontend | React, Vite, TailwindCSS |
-| Backend | NestJS, WebSockets |
-| Datenbank | PostgreSQL (Neon) |
-| Hosting | Render (kostenlos) |
-
-## Features
-
-- Registrierung, Login, Weltkarte (17 Provinzen)
-- Dynastien, Diplomatie, Städte, Schlachten
-- Ressourcen-Ticks, WebSockets
-- Alles online – kein Offline-Spiel
+| Spielstand (GitHub Pages) | localStorage im Browser |
+| Backend (optional) | NestJS, PostgreSQL, WebSockets |
 
 ## Roadmap
-
-| Phase | Status |
-|-------|--------|
-| Cloud-Hosting (ein Link) | ✅ vorbereitet |
-| PWA (Handy Homescreen) | 🔄 Grundlagen da |
-| App Store / Play Store | Geplant |
 
 Details: [docs/roadmap.md](docs/roadmap.md)
 

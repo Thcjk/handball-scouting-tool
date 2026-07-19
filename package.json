@@ -13,6 +13,7 @@
     "dev": "concurrently \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
     "build:prod": "npm run build -w shared && npm run build -w client && npm run db:generate && npm run build -w server",
+    "build:pages": "npm run build:pages -w client",
     "start:prod": "bash scripts/render-start.sh",
     "lint": "npm run lint -w shared && npm run lint -w server && npm run lint -w client",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,css}\"",

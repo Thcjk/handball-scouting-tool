@@ -2,7 +2,7 @@
   "name": "Kronenchronik",
   "short_name": "Kronenchronik",
   "description": "Mittelalter-Strategiespiel – Baue dein Königreich auf",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#1a1a1a",
@@ -10,7 +10,7 @@
   "lang": "de",
   "icons": [
     {
-      "src": "/shield.svg",
+      "src": "./shield.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

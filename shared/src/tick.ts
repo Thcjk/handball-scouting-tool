@@ -1,4 +1,5 @@
-import { Resources, BuildingType, UnitType } from './types';
+import type { Resources } from './types';
+import { BuildingType, UnitType } from './types';
 import { BASE_INCOME } from './resources';
 import { BUILDING_DEFINITIONS } from './buildings';
 import { UNIT_DEFINITIONS } from './units';

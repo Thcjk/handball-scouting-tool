@@ -1,5 +1,6 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { isOfflineMode } from '../api/client';
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -9,8 +10,13 @@ export default function Layout() {
       <header className="bg-medieval-gray border-b border-medieval-brown/50 px-4 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/shield.svg" alt="Wappen" className="w-8 h-8" />
+            <img src={`${import.meta.env.BASE_URL}shield.svg`} alt="Wappen" className="w-8 h-8" />
             <h1 className="text-xl font-bold text-medieval-gold">Kronenchronik</h1>
+            {isOfflineMode && (
+              <span className="text-xs text-green-400 hidden sm:inline" title="Fortschritt wird automatisch im Browser gespeichert">
+                Gespeichert im Browser
+              </span>
+            )}
           </div>
           <nav className="flex items-center gap-2 sm:gap-4 flex-wrap">
             <NavLink

@@ -1,4 +1,5 @@
-import { BuildingDefinition, BuildingType } from './types';
+import type { BuildingDefinition } from './types';
+import { BuildingType } from './types';
 
 export const BUILDING_DEFINITIONS: Record<BuildingType, BuildingDefinition> = {
   [BuildingType.PALISADE]: {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api, type DiplomacyState } from '../api/client';
+import { api, type DiplomacyState, isOfflineMode } from '../api/client';
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   NEUTRAL: { label: 'Neutral', color: 'text-gray-400' },
@@ -46,6 +46,21 @@ export default function DiplomacyPage() {
   if (loading)
     return <div className="text-center text-medieval-gold animate-pulse py-20">Laden...</div>;
   if (!state) return <div className="text-center text-red-400">{error}</div>;
+
+  if (isOfflineMode) {
+    return (
+      <div className="space-y-6 max-w-3xl mx-auto">
+        <h2 className="text-2xl font-bold text-medieval-gold">Diplomatie</h2>
+        <div className="card border border-medieval-gold/40">
+          <p className="text-medieval-gold font-semibold mb-2">Einzelspieler-Modus</p>
+          <p className="text-gray-300 text-sm">
+            Diplomatie mit anderen Spielern ist im Browser-Spiel ohne Server nicht verfügbar.
+            Erobere Provinzen auf der Weltkarte und erweitere dein Königreich.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">

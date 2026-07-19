@@ -35,7 +35,7 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="card w-full max-w-md space-y-6">
         <div className="text-center">
-          <img src="/shield.svg" alt="Wappen" className="w-16 h-16 mx-auto mb-3" />
+          <img src={`${import.meta.env.BASE_URL}shield.svg`} alt="Wappen" className="w-16 h-16 mx-auto mb-3" />
           <h1 className="text-2xl font-bold text-medieval-gold">Konto erstellen</h1>
           <p className="text-gray-400 text-sm mt-1">Gründe deine Dynastie</p>
         </div>

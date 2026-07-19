@@ -1,4 +1,4 @@
-import { ResourceCost } from './types';
+import type { ResourceCost } from './types';
 
 export const CITY_FOUND_COST: ResourceCost = {
   gold: 300,

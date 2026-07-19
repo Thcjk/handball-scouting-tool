@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { GameState, BattleResult } from '../api/client';
+import { isOfflineMode } from '../api/client';
 
 const WS_URL = import.meta.env.VITE_WS_URL || window.location.origin;
 
@@ -55,6 +56,7 @@ export function useGameSocket(options: UseGameSocketOptions) {
   }, []);
 
   useEffect(() => {
+    if (isOfflineMode) return;
     connect();
     return () => disconnect();
   }, [connect, disconnect]);

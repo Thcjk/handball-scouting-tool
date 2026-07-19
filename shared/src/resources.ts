@@ -1,4 +1,4 @@
-import { Resources } from './types';
+import type { Resources } from './types';
 
 export function canAfford(resources: Resources, cost: Partial<Resources>): boolean {
   return (

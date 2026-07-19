@@ -1,4 +1,5 @@
-import { ProvinceSeed, Terrain } from './types';
+import type { ProvinceSeed } from './types';
+import { Terrain } from './types';
 
 export const STARTING_RESOURCES = {
   gold: 500,
