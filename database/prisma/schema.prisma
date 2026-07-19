@@ -1,0 +1,267 @@
+// Prisma schema for Kronenchronik
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Terrain {
+  PLAINS
+  FOREST
+  HILLS
+  MOUNTAINS
+  COAST
+}
+
+enum BuildingType {
+  PALISADE
+  STONE_WALL
+  KEEP
+  GATEHOUSE
+  WATCHTOWER
+  BARRACKS
+  STABLES
+  GRANARY
+  MARKET
+  SMITHY
+  WORKSHOP
+  TOWN_HALL
+  TEMPLE
+  UNIVERSITY
+  HARBOR
+  CITY_WALL
+  FARM
+  MINE
+  LUMBER_MILL
+}
+
+enum UnitType {
+  MILITIA
+  SPEARMAN
+  ARCHER
+  SWORDSMAN
+  CROSSBOWMAN
+  LIGHT_CAVALRY
+  HEAVY_CAVALRY
+  KNIGHT
+}
+
+enum DiplomaticStatus {
+  NEUTRAL
+  ALLIED
+  AT_WAR
+  TRADE_PACT
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  lastSeen  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  kingdom   Kingdom?
+}
+
+model Kingdom {
+  id              String     @id @default(uuid())
+  name            String
+  userId          String     @unique
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gold            Int        @default(500)
+  food            Int        @default(300)
+  wood            Int        @default(200)
+  stone           Int        @default(150)
+  iron            Int        @default(75)
+  influence       Int        @default(20)
+  fame            Int        @default(0)
+  lastTickAt      DateTime   @default(now())
+  dynastyId       String?
+  dynasty         Dynasty?   @relation(fields: [dynastyId], references: [id])
+  provinces       Province[]
+  characters      Character[]
+  armies          Army[]
+  battlesAttacked Battle[]   @relation("AttackerKingdom")
+  battlesDefended Battle[]   @relation("DefenderKingdom")
+  allianceMembership AllianceMember?
+  diplomacyFrom   DiplomaticRelation[] @relation("KingdomA")
+  diplomacyTo     DiplomaticRelation[] @relation("KingdomB")
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model Dynasty {
+  id         String      @id @default(uuid())
+  name       String
+  motto      String?
+  kingdoms   Kingdom[]
+  characters Character[]
+  createdAt  DateTime    @default(now())
+}
+
+model Character {
+  id              String     @id @default(uuid())
+  name            String
+  age             Int        @default(25)
+  isAlive         Boolean    @default(true)
+  isRuler         Boolean    @default(false)
+  isHeir          Boolean    @default(false)
+  attack          Int        @default(5)
+  defense         Int        @default(5)
+  diplomacy       Int        @default(5)
+  stewardship     Int        @default(5)
+  martial         Int        @default(8)
+  kingdomId       String
+  kingdom         Kingdom    @relation(fields: [kingdomId], references: [id], onDelete: Cascade)
+  dynastyId       String?
+  dynasty         Dynasty?   @relation(fields: [dynastyId], references: [id])
+  parentId        String?
+  parent          Character? @relation("Family", fields: [parentId], references: [id])
+  children        Character[] @relation("Family")
+  createdAt       DateTime   @default(now())
+}
+
+model Province {
+  id         String   @id @default(uuid())
+  slug       String   @unique
+  name       String
+  x          Int
+  y          Int
+  terrain    Terrain  @default(PLAINS)
+  population Int      @default(1000)
+  prosperity Int      @default(50)
+  defense    Int      @default(10)
+  kingdomId  String?
+  kingdom    Kingdom? @relation(fields: [kingdomId], references: [id])
+  castle     Castle?
+  city       City?
+  village    Village?
+  buildings  Building[]
+  armies     Army[]
+  battles    Battle[]
+  neighbors  ProvinceNeighbor[] @relation("Province")
+  neighborOf ProvinceNeighbor[] @relation("Neighbor")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model ProvinceNeighbor {
+  id          String   @id @default(uuid())
+  provinceId  String
+  neighborId  String
+  province    Province @relation("Province", fields: [provinceId], references: [id], onDelete: Cascade)
+  neighbor    Province @relation("Neighbor", fields: [neighborId], references: [id], onDelete: Cascade)
+
+  @@unique([provinceId, neighborId])
+}
+
+model Castle {
+  id         String   @id @default(uuid())
+  level      Int      @default(1)
+  provinceId String   @unique
+  province   Province @relation(fields: [provinceId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model City {
+  id         String   @id @default(uuid())
+  level      Int      @default(0)
+  provinceId String   @unique
+  province   Province @relation(fields: [provinceId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Village {
+  id         String   @id @default(uuid())
+  level      Int      @default(1)
+  provinceId String   @unique
+  province   Province @relation(fields: [provinceId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Building {
+  id         String       @id @default(uuid())
+  type       BuildingType
+  level      Int          @default(1)
+  provinceId String
+  province   Province     @relation(fields: [provinceId], references: [id], onDelete: Cascade)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([provinceId, type])
+}
+
+model Army {
+  id         String   @id @default(uuid())
+  name       String
+  kingdomId  String
+  kingdom    Kingdom  @relation(fields: [kingdomId], references: [id], onDelete: Cascade)
+  provinceId String
+  province   Province @relation(fields: [provinceId], references: [id], onDelete: Cascade)
+  morale     Int      @default(100)
+  isGarrison Boolean  @default(false)
+  units      Unit[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Unit {
+  id     String   @id @default(uuid())
+  type   UnitType
+  count  Int
+  armyId String
+  army   Army     @relation(fields: [armyId], references: [id], onDelete: Cascade)
+
+  @@unique([armyId, type])
+}
+
+model Alliance {
+  id          String           @id @default(uuid())
+  name        String
+  description String?
+  members     AllianceMember[]
+  createdAt   DateTime         @default(now())
+}
+
+model AllianceMember {
+  id         String   @id @default(uuid())
+  allianceId String
+  alliance   Alliance @relation(fields: [allianceId], references: [id], onDelete: Cascade)
+  kingdomId  String   @unique
+  kingdom    Kingdom  @relation(fields: [kingdomId], references: [id], onDelete: Cascade)
+  joinedAt   DateTime @default(now())
+}
+
+model DiplomaticRelation {
+  id          String           @id @default(uuid())
+  kingdomAId  String
+  kingdomBId  String
+  status      DiplomaticStatus @default(NEUTRAL)
+  kingdomA    Kingdom          @relation("KingdomA", fields: [kingdomAId], references: [id], onDelete: Cascade)
+  kingdomB    Kingdom          @relation("KingdomB", fields: [kingdomBId], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([kingdomAId, kingdomBId])
+}
+
+model Battle {
+  id          String   @id @default(uuid())
+  attackerId  String
+  attacker    Kingdom  @relation("AttackerKingdom", fields: [attackerId], references: [id])
+  defenderId  String?
+  defender    Kingdom? @relation("DefenderKingdom", fields: [defenderId], references: [id])
+  provinceId  String
+  province    Province @relation(fields: [provinceId], references: [id])
+  attackerWon Boolean
+  report      Json
+  createdAt   DateTime @default(now())
+}

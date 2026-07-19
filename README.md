@@ -1,92 +1,77 @@
-# European Handball Scouting Platform
+# Kronenchronik
 
-Professionelle, datenbasierte Scouting-Plattform für Sportdirektoren, Scouts, Trainer und Analysten.
+Browserbasiertes Mittelalter-Strategiespiel. Baue dein Königreich aus, führe Dynastien, betreibe Diplomatie und erobere die Welt.
 
----
+## Tech-Stack
 
-## Empfohlen: Über GitHub (nicht OneDrive)
-
-OneDrive kann Dateien verzögert synchronisieren und Streamlit-Fehler verursachen.
-**Projekt lokal klonen** (z. B. nach `C:\Projects\`) und von dort starten.
-
-### 1. Repository auf GitHub anlegen
-
-```powershell
-cd C:\Users\chair\OneDrive\Desktop\handball-scouting-tool
-gh auth login
-gh repo create handball-scouting-tool --public --source=. --remote=origin --push
-```
-
-### 2. Frisch klonen (empfohlen)
-
-```powershell
-mkdir C:\Projects -ErrorAction SilentlyContinue
-cd C:\Projects
-git clone https://github.com/DEIN-USERNAME/handball-scouting-tool.git
-cd handball-scouting-tool
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-Browser: **http://localhost:8501**
-
----
-
-## Lokaler Start (ohne Clone)
-
-```powershell
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-Die SQLite-Datenbank (`data/scouting.db`) wird beim ersten Start automatisch aus den CSV-Dateien erzeugt.
-
----
-
-## Technologien
-
-| Layer | Stack |
-|-------|--------|
-| UI | Streamlit (dunkles Design) |
-| Analyse | Pandas, Scikit-Learn, Plotly |
-| Datenbank | SQLite (`data/scouting.db`) |
-| Architektur | Modular, wiederverwendbare Komponenten |
-
----
+| Bereich   | Technologie                                     |
+| --------- | ----------------------------------------------- |
+| Frontend  | React, TypeScript, Vite, TailwindCSS, Socket.IO |
+| Backend   | Node.js, NestJS, JWT, WebSockets                |
+| Datenbank | PostgreSQL, Prisma                              |
+| Monorepo  | npm workspaces                                  |
 
 ## Projektstruktur
 
 ```
-handball-scouting-tool/
-├── app.py                 # Einstieg → Navigation
-├── Home.py                # Startseite
-├── pages/
-│   ├── dashboard.py
-│   ├── scouting_search.py
-│   ├── player_profile.py
-│   ├── player_compare.py
-│   ├── shortlists.py
-│   ├── reports.py
-│   ├── data_import.py
-│   └── leagues.py
-├── components/            # theme, cards, tables, charts, filters
-├── analytics/             # metrics, scoring, similarity, insights
-├── config/score_weights.py
-├── database/              # SQLite, Shortlist-Helper
-├── reports/               # Berichtsgenerator
-└── utils/                 # data_service, validation, navigation
+client/          React-Frontend mit Echtzeit-Updates
+server/          NestJS-Backend (REST + WebSockets)
+shared/          Gemeinsame Spiellogik
+database/        Prisma-Schema
+docs/            Dokumentation
+.github/         CI/CD
 ```
 
----
+## Schnellstart
 
-## Scoring anpassen
+```bash
+npm install
+cp .env.example .env
+npm run db:generate
+npm run db:push
+npm run db:seed
+npm run dev
+```
 
-Gewichtungen in `config/score_weights.py` – Berechnung in `analytics/scoring.py`.
+- Frontend: http://localhost:5173
+- API: http://localhost:3001/api
+- WebSocket: ws://localhost:3001/game
 
----
+## Features
 
-## Roadmap
+### Kern (MVP)
 
-- [ ] PostgreSQL-Migration
-- [ ] PDF-Export (`reports/pdf_export.py`)
-- [ ] Benutzerverwaltung & API
+- Registrierung, Login, Profil
+- Weltkarte mit 17 Provinzen
+- Ressourcen, Gebäude, Rekrutierung, Armeen, Schlachten
+
+### Erweitert
+
+- **Dynastien:** Herrscher, Erben, Thronfolge bei Tod (Alter/Schlacht)
+- **Diplomatie:** Krieg erklären, Frieden, Bündnisse, Handelsabkommen
+- **Ressourcen-Ticks:** Einkommen alle 30s für aktive Spieler (Gebäude, Unterhalt)
+- **WebSockets:** Echtzeit-Updates für Ressourcen, Schlachten, Diplomatie
+- **Städte:** Gründen, ausbauen, Stadtgebäude (Markt, Rathaus, Tempel …)
+
+## API
+
+| Modul     | Endpunkte                                                                                   |
+| --------- | ------------------------------------------------------------------------------------------- |
+| Auth      | `/api/auth/register`, `/login`, `/me`                                                       |
+| Game      | `/api/game/state`, `/build`, `/recruit`, `/army`, `/attack`, `/city/found`, `/city/upgrade` |
+| Dynasty   | `/api/dynasty`                                                                              |
+| Diplomacy | `/api/diplomacy`, `/war`, `/peace`, `/alliance`, `/trade`                                   |
+
+## WebSocket-Events
+
+| Event             | Beschreibung              |
+| ----------------- | ------------------------- |
+| `gameStateUpdate` | Aktualisierter Spielstand |
+| `resourceTick`    | Ressourcen-Einkommen      |
+| `battleResult`    | Schlachtergebnis          |
+| `succession`      | Thronfolge                |
+| `diplomacyEvent`  | Kriegserklärung etc.      |
+
+## Lizenz
+
+MIT

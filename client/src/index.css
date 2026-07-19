@@ -1,0 +1,40 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-medieval-dark: #1a1a1a;
+  --color-medieval-gray: #2d2d2d;
+  --color-medieval-brown: #5c4033;
+  --color-medieval-gold: #d4af37;
+  --color-medieval-red: #8b0000;
+  --color-medieval-green: #2d4a3e;
+  --color-medieval-light: #c4a882;
+  --font-medieval: 'Segoe UI', system-ui, sans-serif;
+}
+
+body {
+  @apply bg-medieval-dark text-gray-100 font-medieval min-h-screen;
+}
+
+.card {
+  @apply bg-medieval-gray border border-medieval-brown/50 rounded-lg p-4 shadow-lg;
+}
+
+.btn-primary {
+  @apply bg-medieval-gold text-medieval-dark font-semibold px-4 py-2 rounded hover:bg-yellow-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+  @apply bg-medieval-brown text-gray-100 font-semibold px-4 py-2 rounded hover:bg-medieval-brown/80 transition-colors border border-medieval-gold/30;
+}
+
+.btn-danger {
+  @apply bg-medieval-red text-white font-semibold px-4 py-2 rounded hover:bg-red-700 transition-colors;
+}
+
+.input-field {
+  @apply w-full bg-medieval-dark border border-medieval-brown/50 rounded px-3 py-2 text-gray-100 focus:outline-none focus:border-medieval-gold;
+}
+
+.resource-badge {
+  @apply inline-flex items-center gap-1 bg-medieval-dark/60 border border-medieval-brown/30 rounded px-2 py-1 text-sm;
+}
