@@ -30,6 +30,7 @@ import {
   UpgradeCastleDto,
   FoundCityDto,
   UpgradeCityDto,
+  MarchDto,
 } from './dto/game.dto';
 import { UnitType } from '@prisma/client';
 import { DynastyService } from '../dynasty/dynasty.service';
@@ -94,6 +95,7 @@ export class GameService {
           wood: kingdom.wood,
           stone: kingdom.stone,
           iron: kingdom.iron,
+          coal: kingdom.coal,
           influence: kingdom.influence,
           fame: kingdom.fame,
         },
@@ -106,6 +108,8 @@ export class GameService {
         x: p.x,
         y: p.y,
         terrain: p.terrain,
+        culture: p.culture,
+        religion: p.religion,
         population: p.population,
         prosperity: p.prosperity,
         defense: p.defense,
@@ -451,49 +455,132 @@ export class GameService {
 
   async attackProvince(userId: string, dto: AttackDto) {
     const kingdom = await this.getKingdomByUser(userId);
+    return this.executeAttack(kingdom.id, dto.armyId, dto.targetProvinceId, false, userId);
+  }
+
+  async marchArmy(userId: string, dto: MarchDto) {
+    const kingdom = await this.getKingdomByUser(userId);
 
     const army = await this.prisma.army.findUnique({
       where: { id: dto.armyId },
-      include: { units: true, province: true },
     });
 
     if (!army || army.kingdomId !== kingdom.id) {
       throw new NotFoundException('Armee nicht gefunden');
     }
-
     if (army.isGarrison) {
-      throw new BadRequestException('Garnisonen können nicht angreifen. Erstelle eine Armee.');
+      throw new BadRequestException('Garnisonen können nicht marschieren');
+    }
+    if (army.status === 'MARCHING') {
+      throw new BadRequestException('Armee marschiert bereits');
     }
 
     const target = await this.prisma.province.findUnique({
       where: { id: dto.targetProvinceId },
+    });
+    if (!target) throw new NotFoundException('Zielprovinz nicht gefunden');
+
+    const neighbors = await this.prisma.provinceNeighbor.findMany({
+      where: { provinceId: army.provinceId },
+    });
+    if (!neighbors.some((n) => n.neighborId === target.id)) {
+      throw new BadRequestException('Ziel muss Nachbarprovinz sein');
+    }
+
+    await this.prisma.army.update({
+      where: { id: army.id },
+      data: {
+        status: 'MARCHING',
+        targetProvinceId: target.id,
+        marchArrivesAt: new Date(Date.now() + 60_000),
+      },
+    });
+
+    return this.emitState(userId);
+  }
+
+  async processMarches() {
+    const marching = await this.prisma.army.findMany({
+      where: { status: 'MARCHING', marchArrivesAt: { lte: new Date() } },
+      include: { kingdom: true },
+    });
+
+    for (const army of marching) {
+      if (!army.targetProvinceId) continue;
+
+      const target = await this.prisma.province.findUnique({
+        where: { id: army.targetProvinceId },
+      });
+      if (!target) continue;
+
+      if (!target.kingdomId || target.kingdomId === army.kingdomId) {
+        await this.prisma.army.update({
+          where: { id: army.id },
+          data: {
+            provinceId: army.targetProvinceId,
+            status: 'IDLE',
+            targetProvinceId: null,
+            marchArrivesAt: null,
+          },
+        });
+      } else {
+        await this.executeAttack(
+          army.kingdomId,
+          army.id,
+          army.targetProvinceId,
+          army.kingdom.isAi,
+          army.kingdom.userId ?? undefined,
+        );
+      }
+
+      if (army.kingdom.userId) {
+        await this.emitState(army.kingdom.userId);
+      }
+    }
+  }
+
+  async executeAttack(
+    kingdomId: string,
+    armyId: string,
+    targetProvinceId: string,
+    skipDiplomacy = false,
+    userId?: string,
+  ) {
+    const kingdom = await this.prisma.kingdom.findUnique({ where: { id: kingdomId } });
+    if (!kingdom) throw new NotFoundException('Königreich nicht gefunden');
+
+    const army = await this.prisma.army.findUnique({
+      where: { id: armyId },
+      include: { units: true },
+    });
+
+    if (!army || army.kingdomId !== kingdom.id) {
+      throw new NotFoundException('Armee nicht gefunden');
+    }
+    if (army.isGarrison) {
+      throw new BadRequestException('Garnisonen können nicht angreifen');
+    }
+
+    const target = await this.prisma.province.findUnique({
+      where: { id: targetProvinceId },
       include: {
-        kingdom: true,
         castle: true,
         village: true,
         city: true,
         armies: { include: { units: true } },
-        neighbors: { include: { neighbor: true } },
       },
     });
 
     if (!target) throw new NotFoundException('Zielprovinz nicht gefunden');
-
-    const sourceNeighbors = await this.prisma.provinceNeighbor.findMany({
-      where: { provinceId: army.provinceId },
-    });
-    const isNeighbor = sourceNeighbors.some((n) => n.neighborId === target.id);
-    if (!isNeighbor) {
-      throw new BadRequestException('Ziel muss an die Ausgangsprovinz angrenzen');
-    }
-
     if (target.kingdomId === kingdom.id) {
       throw new BadRequestException('Eigene Provinzen können nicht angegriffen werden');
     }
 
-    const warCheck = await this.diplomacyService.canAttack(kingdom.id, target.kingdomId);
-    if (!warCheck.allowed) {
-      throw new ForbiddenException(warCheck.reason);
+    if (!skipDiplomacy && target.kingdomId) {
+      const warCheck = await this.diplomacyService.canAttack(kingdom.id, target.kingdomId);
+      if (!warCheck.allowed) {
+        throw new ForbiddenException(warCheck.reason);
+      }
     }
 
     const ruler = await this.prisma.character.findFirst({
@@ -550,7 +637,12 @@ export class GameService {
 
       await this.prisma.army.update({
         where: { id: army.id },
-        data: { provinceId: target.id },
+        data: {
+          provinceId: target.id,
+          status: 'IDLE',
+          targetProvinceId: null,
+          marchArrivesAt: null,
+        },
       });
 
       await this.prisma.kingdom.update({
@@ -567,6 +659,11 @@ export class GameService {
       if (!target.city) {
         await this.prisma.city.create({ data: { provinceId: target.id, level: 0 } });
       }
+    } else {
+      await this.prisma.army.update({
+        where: { id: army.id },
+        data: { status: 'IDLE', targetProvinceId: null, marchArrivesAt: null },
+      });
     }
 
     const battle = await this.prisma.battle.create({
@@ -579,14 +676,17 @@ export class GameService {
       },
     });
 
-    const gameState = await this.emitState(userId);
-    this.gameGateway.emitToUser(userId, 'battleResult', {
-      battle,
-      result: battleResult,
-      successionResult,
-    });
+    if (userId) {
+      const gameState = await this.emitState(userId);
+      this.gameGateway.emitToUser(userId, 'battleResult', {
+        battle,
+        result: battleResult,
+        successionResult,
+      });
+      return { battle, result: battleResult, successionResult, gameState };
+    }
 
-    return { battle, result: battleResult, successionResult, gameState };
+    return { battle, result: battleResult, successionResult };
   }
 
   private async emitState(userId: string) {

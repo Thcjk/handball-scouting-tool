@@ -57,6 +57,16 @@ enum DiplomaticStatus {
   TRADE_PACT
 }
 
+enum ArmyStatus {
+  IDLE
+  MARCHING
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -71,13 +81,17 @@ model User {
 model Kingdom {
   id              String     @id @default(uuid())
   name            String
-  userId          String     @unique
-  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String?    @unique
+  user            User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isAi            Boolean    @default(false)
+  culture         String     @default("germanisch")
+  religion        String     @default("lichtglaube")
   gold            Int        @default(500)
   food            Int        @default(300)
   wood            Int        @default(200)
   stone           Int        @default(150)
   iron            Int        @default(75)
+  coal            Int        @default(0)
   influence       Int        @default(20)
   fame            Int        @default(0)
   lastTickAt      DateTime   @default(now())
@@ -108,14 +122,20 @@ model Character {
   id              String     @id @default(uuid())
   name            String
   age             Int        @default(25)
+  gender          Gender     @default(MALE)
   isAlive         Boolean    @default(true)
   isRuler         Boolean    @default(false)
   isHeir          Boolean    @default(false)
+  traits          String[]   @default([])
+  experience      Int        @default(0)
+  health          Int        @default(100)
+  prestige        Int        @default(0)
   attack          Int        @default(5)
   defense         Int        @default(5)
   diplomacy       Int        @default(5)
   stewardship     Int        @default(5)
   martial         Int        @default(8)
+  intrigue        Int        @default(5)
   kingdomId       String
   kingdom         Kingdom    @relation(fields: [kingdomId], references: [id], onDelete: Cascade)
   dynastyId       String?
@@ -133,6 +153,8 @@ model Province {
   x          Int
   y          Int
   terrain    Terrain  @default(PLAINS)
+  culture    String?
+  religion   String?
   population Int      @default(1000)
   prosperity Int      @default(50)
   defense    Int      @default(10)
@@ -142,7 +164,8 @@ model Province {
   city       City?
   village    Village?
   buildings  Building[]
-  armies     Army[]
+  armies     Army[]   @relation("ArmyLocation")
+  armiesMarching Army[] @relation("ArmyMarchTarget")
   battles    Battle[]
   neighbors  ProvinceNeighbor[] @relation("Province")
   neighborOf ProvinceNeighbor[] @relation("Neighbor")
@@ -200,17 +223,21 @@ model Building {
 }
 
 model Army {
-  id         String   @id @default(uuid())
-  name       String
-  kingdomId  String
-  kingdom    Kingdom  @relation(fields: [kingdomId], references: [id], onDelete: Cascade)
-  provinceId String
-  province   Province @relation(fields: [provinceId], references: [id], onDelete: Cascade)
-  morale     Int      @default(100)
-  isGarrison Boolean  @default(false)
-  units      Unit[]
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id               String     @id @default(uuid())
+  name             String
+  kingdomId        String
+  kingdom          Kingdom    @relation(fields: [kingdomId], references: [id], onDelete: Cascade)
+  provinceId       String
+  province         Province   @relation("ArmyLocation", fields: [provinceId], references: [id], onDelete: Cascade)
+  targetProvinceId String?
+  targetProvince   Province?  @relation("ArmyMarchTarget", fields: [targetProvinceId], references: [id])
+  status           ArmyStatus @default(IDLE)
+  marchArrivesAt   DateTime?
+  morale           Int        @default(100)
+  isGarrison       Boolean    @default(false)
+  units            Unit[]
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 }
 
 model Unit {

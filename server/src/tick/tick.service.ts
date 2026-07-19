@@ -12,6 +12,7 @@ import {
 } from '@kronenchronik/shared';
 import { DynastyService } from '../dynasty/dynasty.service';
 import { GameGateway } from '../game/game.gateway';
+import { GameService } from '../game/game.service';
 import { BuildingType, UnitType } from '@prisma/client';
 
 @Injectable()
@@ -23,10 +24,12 @@ export class TickService {
     private prisma: PrismaService,
     private dynastyService: DynastyService,
     private gameGateway: GameGateway,
+    private gameService: GameService,
   ) {}
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async processTicks() {
+    await this.gameService.processMarches();
     const activeSince = new Date(Date.now() - ACTIVE_PLAYER_WINDOW_MS);
     const activeUsers = await this.prisma.user.findMany({
       where: { lastSeen: { gte: activeSince }, kingdom: { isNot: null } },
@@ -56,7 +59,6 @@ export class TickService {
   async tickKingdom(
     kingdom: {
       id: string;
-      userId: string;
       gold: number;
       food: number;
       wood: number;

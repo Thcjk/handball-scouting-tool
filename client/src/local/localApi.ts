@@ -348,7 +348,7 @@ export function applyResourceTick(userId: string): GameState | null {
   const kid = save.kingdom.id;
   const owned = save.provinces.filter((p) => p.ownerId === kid);
 
-  let totalIncome = { gold: 0, food: 0, wood: 0, stone: 0, iron: 0, influence: 0 };
+  const totalIncome = { gold: 0, food: 0, wood: 0, stone: 0, iron: 0, influence: 0 };
   for (const p of owned) {
     const income = calculateProvinceIncome({
       buildings: p.buildings.map((b) => ({ type: b.type as BuildingType, level: b.level })),
@@ -696,6 +696,17 @@ export const localApi = {
 
   async getDynasty(): Promise<DynastyInfo> {
     return loadSave(getSessionUserId()!)!.dynasty;
+  },
+
+  async march(data: { armyId: string; targetProvinceId: string }) {
+    const { userId, save } = requireSave();
+    const army = save.armies.find((a) => a.id === data.armyId);
+    if (!army || army.isGarrison) throw new Error('Armee nicht gefunden');
+    const target = save.provinces.find((p) => p.id === data.targetProvinceId)!;
+    const source = save.provinces.find((p) => p.id === army.provinceId)!;
+    if (!source.neighborSlugs.includes(target.slug)) throw new Error('Muss Nachbar sein');
+    army.provinceId = target.id;
+    return persist(userId, save);
   },
 
   async getDiplomacy(): Promise<DiplomacyState> {

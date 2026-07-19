@@ -35,7 +35,7 @@ export class DiplomacyService {
 
     const allKingdoms = await this.prisma.kingdom.findMany({
       where: { id: { not: kingdom.id } },
-      select: { id: true, name: true, fame: true, user: { select: { username: true } } },
+      select: { id: true, name: true, fame: true, isAi: true, user: { select: { username: true } } },
     });
 
     const alliances = await this.prisma.alliance.findMany({
@@ -55,7 +55,12 @@ export class DiplomacyService {
         partner: r.kingdomAId === kingdom.id ? r.kingdomB : r.kingdomA,
         partnerId: r.kingdomAId === kingdom.id ? r.kingdomBId : r.kingdomAId,
       })),
-      kingdoms: allKingdoms,
+      kingdoms: allKingdoms.map((k) => ({
+        id: k.id,
+        name: k.name,
+        fame: k.fame,
+        user: { username: k.isAi ? '🤖 KI' : (k.user?.username ?? 'Unbekannt') },
+      })),
       myAlliance: myAlliance
         ? {
             id: myAlliance.id,
@@ -103,10 +108,12 @@ export class DiplomacyService {
       data: { influence: { decrement: DIPLOMACY_COSTS.declareWar.influence } },
     });
 
-    this.gameGateway.emitToUser(target.userId, 'diplomacyEvent', {
-      type: 'war_declared',
-      from: kingdom.name,
-    });
+    if (target.userId) {
+      this.gameGateway.emitToUser(target.userId, 'diplomacyEvent', {
+        type: 'war_declared',
+        from: kingdom.name,
+      });
+    }
 
     return this.getDiplomacyState(userId);
   }

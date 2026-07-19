@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
-import { STARTING_RESOURCES } from '@kronenchronik/shared';
+import { STARTING_RESOURCES, randomTraits } from '@kronenchronik/shared';
 import { DynastyService } from '../dynasty/dynasty.service';
 
 @Injectable()
@@ -57,10 +57,16 @@ export class AuthService {
               create: {
                 name: dto.rulerName,
                 isRuler: true,
+                gender: 'MALE',
+                traits: randomTraits(2),
                 dynastyId: dynasty.id,
                 martial: 10,
                 diplomacy: 7,
                 stewardship: 8,
+                intrigue: 5,
+                prestige: 0,
+                experience: 0,
+                health: 100,
               },
             },
           },

@@ -54,3 +54,11 @@ export class UpgradeCityDto {
   @IsUUID()
   provinceId!: string;
 }
+
+export class MarchDto {
+  @IsUUID()
+  armyId!: string;
+
+  @IsUUID()
+  targetProvinceId!: string;
+}

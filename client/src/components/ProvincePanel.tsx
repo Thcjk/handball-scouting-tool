@@ -285,21 +285,32 @@ export default function ProvincePanel({
 
       {!isOwned && isNeighbor && attackableArmies.length > 0 && (
         <div className="space-y-2 border-t border-medieval-brown/30 pt-3">
-          <h3 className="font-semibold text-medieval-red">Angriff</h3>
+          <h3 className="font-semibold text-medieval-red">Militär</h3>
           {attackableArmies.map((army: Army) => (
-            <button
-              key={army.id}
-              disabled={loading}
-              onClick={() =>
-                handleAction(async () => {
-                  const res = await api.attack({ armyId: army.id, targetProvinceId: province.id });
-                  return { gameState: res.gameState, result: res.result };
-                })
-              }
-              className="btn-danger w-full text-sm"
-            >
-              Angreifen mit {army.name}
-            </button>
+            <div key={army.id} className="space-y-1">
+              <div className="text-xs text-gray-400">{army.name} {army.status === 'MARCHING' ? '(marschiert)' : ''}</div>
+              <button
+                disabled={loading || army.status === 'MARCHING'}
+                onClick={() =>
+                  handleAction(() => api.march({ armyId: army.id, targetProvinceId: province.id }))
+                }
+                className="btn-secondary w-full text-sm"
+              >
+                🚶 Marschieren (60s)
+              </button>
+              <button
+                disabled={loading || army.status === 'MARCHING'}
+                onClick={() =>
+                  handleAction(async () => {
+                    const res = await api.attack({ armyId: army.id, targetProvinceId: province.id });
+                    return { gameState: res.gameState, result: res.result };
+                  })
+                }
+                className="btn-danger w-full text-sm"
+              >
+                ⚔️ Sofort angreifen
+              </button>
+            </div>
           ))}
         </div>
       )}

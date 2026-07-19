@@ -8,6 +8,7 @@ import { GameModule } from './game/game.module';
 import { DynastyModule } from './dynasty/dynasty.module';
 import { DiplomacyModule } from './diplomacy/diplomacy.module';
 import { TickModule } from './tick/tick.module';
+import { AiModule } from './ai/ai.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -20,6 +21,7 @@ import { AppController } from './app.controller';
     DynastyModule,
     DiplomacyModule,
     TickModule,
+    AiModule,
     GameModule,
   ],
   controllers: [AppController],

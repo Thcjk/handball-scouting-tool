@@ -77,6 +77,9 @@ const remoteApi = {
       body: JSON.stringify(data),
     }),
 
+  march: (data: { armyId: string; targetProvinceId: string }) =>
+    request<GameState>('/game/march', { method: 'POST', body: JSON.stringify(data) }),
+
   getDynasty: () => request<DynastyInfo>('/dynasty'),
   getDiplomacy: () => request<DiplomacyState>('/diplomacy'),
   declareWar: (targetKingdomId: string) =>
@@ -147,6 +150,7 @@ export interface Resources {
   wood: number;
   stone: number;
   iron: number;
+  coal?: number;
   influence: number;
   fame: number;
 }
@@ -155,12 +159,18 @@ export interface Character {
   id: string;
   name: string;
   age: number;
+  gender?: string;
+  traits?: string[];
+  experience?: number;
+  health?: number;
+  prestige?: number;
   isAlive: boolean;
   isRuler: boolean;
   isHeir: boolean;
   martial: number;
   diplomacy: number;
   stewardship: number;
+  intrigue?: number;
 }
 
 export interface DynastyInfo {
@@ -189,6 +199,8 @@ export interface Province {
   x: number;
   y: number;
   terrain: string;
+  culture?: string | null;
+  religion?: string | null;
   population: number;
   prosperity: number;
   defense: number;
@@ -208,6 +220,9 @@ export interface Army {
   name: string;
   morale: number;
   isGarrison: boolean;
+  status?: string;
+  targetProvinceId?: string | null;
+  marchArrivesAt?: string | null;
   provinceId?: string;
   units: Array<{ id: string; type: string; count: number }>;
   province?: { id: string; name: string };

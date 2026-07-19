@@ -9,6 +9,7 @@ import {
   UpgradeCastleDto,
   FoundCityDto,
   UpgradeCityDto,
+  MarchDto,
 } from './dto/game.dto';
 
 @Controller('game')
@@ -54,5 +55,10 @@ export class GameController {
   @Post('attack')
   attack(@Request() req: { user: { id: string } }, @Body() dto: AttackDto) {
     return this.gameService.attackProvince(req.user.id, dto);
+  }
+
+  @Post('march')
+  march(@Request() req: { user: { id: string } }, @Body() dto: MarchDto) {
+    return this.gameService.marchArmy(req.user.id, dto);
   }
 }

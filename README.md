@@ -1,32 +1,50 @@
 # Kronenchronik
 
-Browserbasiertes Mittelalter-Strategiespiel – direkt im Browser spielen, Fortschritt wird lokal gespeichert.
+Browserbasiertes Mittelalter-Strategiespiel – **nur online**, mit Server-Speicherung.
 
 ## Jetzt spielen
 
-**https://thcjk.github.io/Kronenchronik/**
+**https://kronenchronik.onrender.com**
 
-1. Link öffnen
-2. Einmal registrieren (E-Mail, Passwort, Königreichsname)
-3. Spielen – dein Fortschritt wird **automatisch im Browser gespeichert**
-4. Beim nächsten Besuch einfach wieder einloggen und weiterspielen
+1. Link öffnen → registrieren → einloggen
+2. Dein Fortschritt wird **serverseitig in der Datenbank** gespeichert
+3. Von jedem Gerät mit Login weiterspielen
 
-> Kein Server, keine Installation, keine Kosten. Der Spielstand liegt nur auf deinem Gerät (localStorage). Browser-Daten löschen = Spielstand weg.
+> Beim ersten Aufruf nach Inaktivität kann der Server ~30 Sek. brauchen (Render Free Tier).
 
----
-
-## Features
-
-- Registrierung & Login (lokal im Browser)
-- Weltkarte mit 17 Provinzen
-- Burgen, Gebäude, Armeen, Schlachten
-- Städte gründen und ausbauen
-- Dynastien & Ressourcen-Ticks
-- Automatisches Speichern nach jeder Aktion
+GitHub-Seite: **https://thcjk.github.io/Kronenchronik/** (leitet zum Spiel weiter)
 
 ---
 
-## Entwicklung (optional)
+## Features (MVP)
+
+| Bereich | Status |
+|---------|--------|
+| Login & Registrierung (JWT) | ✅ |
+| Interaktive Weltkarte (Zoom, Pan, Grenzen) | ✅ |
+| 17 Provinzen mit Kultur & Religion | ✅ |
+| Charaktere mit Eigenschaften & Fähigkeiten | ✅ |
+| Dynastien & Thronfolge | ✅ |
+| Burgen, Dörfer, Städte | ✅ |
+| Gebäude & Wirtschaft | ✅ |
+| Armeen, Rekrutierung, Marsch | ✅ |
+| Schlachten & Eroberung | ✅ |
+| Diplomatie (Krieg, Frieden, Bündnisse) | ✅ |
+| KI-Gegner (4 Königreiche) | ✅ |
+| Server-Speicherung (PostgreSQL) | ✅ |
+| WebSockets (Live-Updates) | ✅ |
+
+---
+
+## Ersteinrichtung (einmalig, kostenlos)
+
+👉 **[docs/EINRICHTUNG.md](docs/EINRICHTUNG.md)**
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Thcjk/Kronenchronik)
+
+---
+
+## Entwicklung
 
 ```bash
 npm install && cp .env.example .env
@@ -34,25 +52,21 @@ npm run db:generate && npm run db:push && npm run db:seed
 npm run dev
 ```
 
-Für den Online-Modus mit Server (NestJS + PostgreSQL) siehe [docs/EINRICHTUNG.md](docs/EINRICHTUNG.md).
-
-GitHub Pages Build lokal testen:
-
-```bash
-npm run build:pages -w client
-```
+- Frontend: http://localhost:5173
+- Backend: http://localhost:3001
 
 ## Tech-Stack
 
 | Bereich | Technologie |
 |---------|-------------|
 | Frontend | React, Vite, TailwindCSS |
-| Spielstand (GitHub Pages) | localStorage im Browser |
-| Backend (optional) | NestJS, PostgreSQL, WebSockets |
+| Backend | NestJS, JWT, WebSockets |
+| Datenbank | PostgreSQL (Prisma) |
+| Hosting | Render + Neon (kostenlos) |
 
-## Roadmap
+## Vision & Roadmap
 
-Details: [docs/roadmap.md](docs/roadmap.md)
+Details: [docs/vision.md](docs/vision.md) · [docs/roadmap.md](docs/roadmap.md)
 
 ## Lizenz
 

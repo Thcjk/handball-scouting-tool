@@ -5,7 +5,7 @@ import { useGameSocket } from '../hooks/useGameSocket';
 import ResourceBar from '../components/ResourceBar';
 import WorldMap from '../components/WorldMap';
 import ProvincePanel from '../components/ProvincePanel';
-import DynastyPanel from '../components/DynastyPanel';
+import CharacterPanel from '../components/CharacterPanel';
 
 export default function GamePage() {
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -137,10 +137,11 @@ export default function GamePage() {
         <div className="lg:col-span-2 space-y-4">
           <WorldMap
             provinces={gameState.provinces}
+            armies={gameState.armies}
             selectedId={selectedProvince?.id ?? null}
             onSelect={handleSelect}
           />
-          {gameState.dynasty && <DynastyPanel dynasty={gameState.dynasty} />}
+          {gameState.dynasty && <CharacterPanel dynasty={gameState.dynasty} />}
         </div>
         <div>
           {selectedProvince ? (
