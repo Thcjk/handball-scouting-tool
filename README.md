@@ -1,72 +1,54 @@
 # Kronenchronik
 
-Browserbasiertes Mittelalter-Strategiespiel – **nur online**, mit Server-Speicherung.
+Mittelalter-Strategiespiel – **direkt im Browser**, ohne Server, ohne Installation.
 
 ## Jetzt spielen
 
-**https://kronenchronik.onrender.com**
+### **https://thcjk.github.io/Kronenchronik/**
 
-1. Link öffnen → registrieren → einloggen
-2. Dein Fortschritt wird **serverseitig in der Datenbank** gespeichert
-3. Von jedem Gerät mit Login weiterspielen
+1. Link öffnen (auch auf dem Handy)
+2. Einmal **registrieren**
+3. Spielen – Fortschritt wird **automatisch im Browser gespeichert**
+4. Beim nächsten Mal: Link öffnen → **einloggen** → weiterspielen
 
-> Beim ersten Aufruf nach Inaktivität kann der Server ~30 Sek. brauchen (Render Free Tier).
-
-GitHub-Seite: **https://thcjk.github.io/Kronenchronik/** (leitet zum Spiel weiter)
-
----
-
-## Features (MVP)
-
-| Bereich | Status |
-|---------|--------|
-| Login & Registrierung (JWT) | ✅ |
-| Interaktive Weltkarte (Zoom, Pan, Grenzen) | ✅ |
-| 17 Provinzen mit Kultur & Religion | ✅ |
-| Charaktere mit Eigenschaften & Fähigkeiten | ✅ |
-| Dynastien & Thronfolge | ✅ |
-| Burgen, Dörfer, Städte | ✅ |
-| Gebäude & Wirtschaft | ✅ |
-| Armeen, Rekrutierung, Marsch | ✅ |
-| Schlachten & Eroberung | ✅ |
-| Diplomatie (Krieg, Frieden, Bündnisse) | ✅ |
-| KI-Gegner (4 Königreiche) | ✅ |
-| Server-Speicherung (PostgreSQL) | ✅ |
-| WebSockets (Live-Updates) | ✅ |
+> Kein Server, keine Kosten, keine Einrichtung. Der Spielstand liegt auf deinem Gerät (localStorage). Browser-Daten löschen = Spielstand weg.
 
 ---
 
-## Ersteinrichtung (einmalig, kostenlos)
+## Features
 
-👉 **[docs/EINRICHTUNG.md](docs/EINRICHTUNG.md)**
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Thcjk/Kronenchronik)
+- Weltkarte mit Zoom & Verschieben
+- Burgen, Städte, Gebäude, Armeen
+- Schlachten & Provinzen erobern
+- Dynastien & Charaktere mit Eigenschaften
+- Automatisches Speichern nach jeder Aktion
 
 ---
 
-## Entwicklung
+## Entwicklung (optional)
 
 ```bash
-npm install && cp .env.example .env
-npm run db:generate && npm run db:push && npm run db:seed
+npm install
 npm run dev
 ```
 
-- Frontend: http://localhost:5173
-- Backend: http://localhost:3001
+GitHub Pages lokal testen:
 
-## Tech-Stack
+```bash
+npm run build:pages -w client
+```
 
-| Bereich | Technologie |
-|---------|-------------|
-| Frontend | React, Vite, TailwindCSS |
-| Backend | NestJS, JWT, WebSockets |
-| Datenbank | PostgreSQL (Prisma) |
-| Hosting | Render + Neon (kostenlos) |
+## E-Mail-Benachrichtigungen abschalten
 
-## Vision & Roadmap
+Falls du bei jedem Update eine E-Mail von GitHub bekommst:
 
-Details: [docs/vision.md](docs/vision.md) · [docs/roadmap.md](docs/roadmap.md)
+1. **GitHub:** [github.com/settings/notifications](https://github.com/settings/notifications)
+   - Bei **Actions** Häkchen bei E-Mail entfernen (nur Web reicht)
+   - Oder Repository **Kronenchronik** → **Unwatch** / **Custom** → Actions aus
+
+2. **Cursor (Cloud Agent):** Cursor → Einstellungen → Benachrichtigungen → E-Mails für Agent-Läufe deaktivieren
+
+Details: [docs/BENACHRICHTIGUNGEN.md](docs/BENACHRICHTIGUNGEN.md)
 
 ## Lizenz
 
