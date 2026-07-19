@@ -2,9 +2,16 @@
 
 Browserbasiertes Mittelalter-Strategiespiel. Baue dein Königreich aus, führe Dynastien, betreibe Diplomatie und erobere die Welt.
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Thcjk/handball-scouting-tool?quickstart=1)
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://github.com/codespaces/new?repo=Thcjk/Kronenchronik)
+
+**Startseite:** https://thcjk.github.io/Kronenchronik/ (dort auf „Jetzt spielen“ tippen)
 
 ## Spiel starten (über GitHub – empfohlen)
+
+> **Wichtig:** Der GitHub-Link (`thcjk.github.io`) ist nur die **Startseite**.
+> Das Spiel selbst startest du über **GitHub Codespaces** – ein Klick, dann 2–3 Min. warten.
+
+**Schnellstart:** [Jetzt spielen (Codespace erstellen)](https://github.com/codespaces/new?repo=Thcjk/Kronenchronik)
 
 Du brauchst **keinen lokalen PC-Setup**. Alles läuft im Browser über GitHub Codespaces:
 
