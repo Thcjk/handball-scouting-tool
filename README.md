@@ -40,13 +40,9 @@ npm run build:pages -w client
 
 ## E-Mail-Benachrichtigungen abschalten
 
-Falls du bei jedem Update eine E-Mail von GitHub bekommst:
+**Cursor-E-Mails** (Agent): Cursor → Einstellungen → Notifications → E-Mail für Agents **aus**
 
-1. **GitHub:** [github.com/settings/notifications](https://github.com/settings/notifications)
-   - Bei **Actions** Häkchen bei E-Mail entfernen (nur Web reicht)
-   - Oder Repository **Kronenchronik** → **Unwatch** / **Custom** → Actions aus
-
-2. **Cursor (Cloud Agent):** Cursor → Einstellungen → Benachrichtigungen → E-Mails für Agent-Läufe deaktivieren
+**GitHub-E-Mails:** https://github.com/settings/notifications → Actions → E-Mail aus
 
 Details: [docs/BENACHRICHTIGUNGEN.md](docs/BENACHRICHTIGUNGEN.md)
 
