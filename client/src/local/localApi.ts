@@ -1,6 +1,8 @@
 import {
-  WORLD_PROVINCES,
   STARTING_RESOURCES,
+  allWorldProvinceSeeds,
+  cultureReligionForRegion,
+  regionForProvince,
   resolveBattle,
   UNIT_DEFINITIONS,
   BUILDING_DEFINITIONS,
@@ -42,6 +44,7 @@ import {
   relationLabel,
   personalityLabel,
   WAR_REASONS,
+  WONDERS,
   type CityTile,
   type ProvinceDevStats,
   type AiKingdomState,
@@ -81,6 +84,23 @@ import {
   titleProgressHint,
   type DynastySimState,
 } from './dynastySim';
+import {
+  beginWonder,
+  buildFleet,
+  defaultRealmSim,
+  doPilgrimage,
+  foundKnightOrder,
+  grantVassal,
+  huntPirates,
+  migrateRealmState,
+  realmUiCatalog,
+  runRealmTick,
+  setRealmLaw,
+  setResearchBudget,
+  setSuccession,
+  startResearch,
+  type RealmSimState,
+} from './realmSim';
 
 const USERS_KEY = 'kronenchronik_users';
 const SESSION_KEY = 'kronenchronik_session';
@@ -175,6 +195,9 @@ interface GameSave {
   lastWorldAlert?: string;
   /** Phase 4 – Dynastie & Hof */
   dynastySim?: DynastySimState;
+  /** Phase 5.1 – Großes Königreich */
+  realmSim?: RealmSimState;
+  worldExpanded?: boolean;
 }
 
 function saveKey(userId: string) {
@@ -281,6 +304,68 @@ function ensureWorldFields(save: GameSave) {
     }
   }
   ensureDynastySim(save);
+  expandWorldIfNeeded(save);
+  ensureRealmSim(save);
+}
+
+function ensureRealmSim(save: GameSave) {
+  const coastal = save.provinces
+    .filter((p) => p.terrain === 'COAST' || p.terrain === Terrain.COAST)
+    .map((p) => p.id);
+  save.realmSim = migrateRealmState(save.realmSim, coastal);
+}
+
+/** Bestehende Spielstände um Phase-5-Provinzen erweitern */
+function expandWorldIfNeeded(save: GameSave) {
+  if (save.worldExpanded && save.provinces.length >= allWorldProvinceSeeds().length) return;
+  const seeds = allWorldProvinceSeeds();
+  const byName = new Map(save.provinces.map((p) => [p.name, p]));
+  const cultureByTerrain: Record<string, string> = {
+    PLAINS: 'germanisch',
+    FOREST: 'slawisch',
+    HILLS: 'frankisch',
+    MOUNTAINS: 'nordisch',
+    COAST: 'romanisch',
+  };
+  for (const seed of seeds) {
+    if (byName.has(seed.name)) continue;
+    const region = regionForProvince(seed.name);
+    const cr = cultureReligionForRegion(region);
+    const p: SaveProvince = {
+      id: slugify(seed.name),
+      slug: slugify(seed.name),
+      name: seed.name,
+      x: seed.x,
+      y: seed.y,
+      terrain: seed.terrain,
+      culture: cr.culture || cultureByTerrain[seed.terrain] || 'germanisch',
+      religion: cr.religion || 'lichtglaube',
+      population: seed.population,
+      prosperity: 45,
+      defense: 10,
+      ownerId: null,
+      ownerName: null,
+      castle: null,
+      village: null,
+      city: null,
+      buildings: [],
+      neighborSlugs: seed.neighbors.map(slugify),
+      forestStock: 1000,
+      mineStock: 800,
+    };
+    save.provinces.push(p);
+    byName.set(p.name, p);
+  }
+  // Nachbarn synchronisieren (reziprok)
+  for (const seed of seeds) {
+    const p = byName.get(seed.name);
+    if (!p) continue;
+    const wanted = new Set(seed.neighbors.map(slugify));
+    for (const slug of wanted) {
+      if (!p.neighborSlugs.includes(slug)) p.neighborSlugs.push(slug);
+    }
+  }
+  save.worldExpanded = true;
 }
 
 function ensureDynastySim(save: GameSave) {
@@ -383,30 +468,34 @@ function createWorld(): SaveProvince[] {
     MOUNTAINS: 'nordisch',
     COAST: 'romanisch',
   };
-  return WORLD_PROVINCES.map((seed) => ({
-    id: slugify(seed.name),
-    slug: slugify(seed.name),
-    name: seed.name,
-    x: seed.x,
-    y: seed.y,
-    terrain: seed.terrain,
-    culture: cultureByTerrain[seed.terrain] ?? 'germanisch',
-    religion: 'lichtglaube',
-    population: seed.population,
-    prosperity: 50,
-    defense: 10,
-    ownerId: null,
-    ownerName: null,
-    castle: null,
-    village: null,
-    city: null,
-    buildings: [],
-    neighborSlugs: seed.neighbors.map(slugify),
-    cityGrid: undefined,
-    devStats: undefined,
-    forestStock: 1000,
-    mineStock: 800,
-  }));
+  return allWorldProvinceSeeds().map((seed) => {
+    const region = regionForProvince(seed.name);
+    const cr = cultureReligionForRegion(region);
+    return {
+      id: slugify(seed.name),
+      slug: slugify(seed.name),
+      name: seed.name,
+      x: seed.x,
+      y: seed.y,
+      terrain: seed.terrain,
+      culture: cr.culture || cultureByTerrain[seed.terrain] || 'germanisch',
+      religion: cr.religion || 'lichtglaube',
+      population: seed.population,
+      prosperity: 50,
+      defense: 10,
+      ownerId: null,
+      ownerName: null,
+      castle: null,
+      village: null,
+      city: null,
+      buildings: [],
+      neighborSlugs: seed.neighbors.map(slugify),
+      cityGrid: undefined,
+      devStats: undefined,
+      forestStock: 1000,
+      mineStock: 800,
+    };
+  });
 }
 
 function createNewSave(kingdomName: string, rulerName: string): GameSave {
@@ -524,7 +613,11 @@ function createNewSave(kingdomName: string, rulerName: string): GameSave {
       },
     },
     lastTickAt: Date.now(),
+    worldExpanded: true,
     ...defaultWorldExtras(),
+    realmSim: defaultRealmSim(
+      provinces.filter((p) => p.terrain === Terrain.COAST || p.terrain === 'COAST').map((p) => p.id),
+    ),
   };
 }
 
@@ -674,6 +767,23 @@ function toGameState(save: GameSave): GameState {
           marriages: save.dynastySim.marriages,
           spouseCandidates: save.dynastySim.spouseCandidates,
           meta: save.dynastySim.meta,
+        }
+      : undefined,
+    realm: save.realmSim
+      ? {
+          laws: save.realmSim.laws,
+          tech: save.realmSim.tech,
+          faith: save.realmSim.faith,
+          vassals: save.realmSim.vassals,
+          wonders: save.realmSim.wonders,
+          fleets: save.realmSim.fleets,
+          seaRoutes: save.realmSim.seaRoutes,
+          pirates: save.realmSim.pirates.filter((p) => p.active),
+          civilWar: save.realmSim.civilWar,
+          researchBudget: save.realmSim.researchBudget,
+          civilWarRisk: save.realmSim.lastCivilWarRisk,
+          civilWarReason: save.realmSim.lastCivilWarReason,
+          catalog: realmUiCatalog(),
         }
       : undefined,
   };
@@ -830,6 +940,37 @@ export function applyResourceTick(userId: string): GameState | null {
   else if (alerts.warAlert) save.lastWorldAlert = alerts.warAlert;
   else if (alerts.successionMsg) save.lastWorldAlert = alerts.successionMsg;
   else save.lastWorldAlert = undefined;
+
+  // Phase 5.1: Großes Königreich
+  ensureRealmSim(save);
+  const ownedProv = save.provinces.filter((p) => p.ownerId === save.kingdom.id);
+  const taxAvg =
+    ownedProv.reduce((s, p) => s + (p.devStats?.taxRate ?? 30), 0) / Math.max(1, ownedProv.length);
+  const prospAvg =
+    ownedProv.reduce((s, p) => s + (p.prosperity ?? 50), 0) / Math.max(1, ownedProv.length);
+  const coastalIds = save.provinces
+    .filter((p) => p.terrain === Terrain.COAST || p.terrain === 'COAST')
+    .map((p) => p.id);
+  const realm = runRealmTick({
+    state: save.realmSim!,
+    tickCount: save.tickCount ?? 0,
+    playerName: save.dynasty.ruler?.name ?? save.kingdom.name,
+    taxRateAvg: taxAvg,
+    prosperityAvg: prospAvg,
+    warCount: (save.wars ?? []).filter(
+      (w) => w.attackerId === save.kingdom.id || w.defenderId === save.kingdom.id,
+    ).length,
+    atWar: (save.wars ?? []).some(
+      (w) => w.attackerId === save.kingdom.id || w.defenderId === save.kingdom.id,
+    ),
+    coastalProvinceIds: coastalIds,
+  });
+  save.realmSim = realm.state;
+  save.chronicle = [...(save.chronicle ?? []), ...realm.chronicle];
+  save.kingdom.gold = Math.max(0, save.kingdom.gold + realm.goldDelta);
+  save.kingdom.food = Math.max(0, save.kingdom.food + realm.foodDelta);
+  save.kingdom.fame += realm.fameDelta;
+  if (realm.alert) save.lastWorldAlert = realm.alert;
 
   storeSave(userId, save);
   return toGameState(save);
@@ -1759,6 +1900,220 @@ export const localApi = {
       ),
     );
     ensureDynastySim(save);
+    return persist(userId, save);
+  },
+
+  async setSuccessionLaw(data: { law: string }) {
+    const { userId, save } = requireSave();
+    ensureRealmSim(save);
+    save.realmSim = setSuccession(
+      save.realmSim!,
+      data.law as 'primogeniture' | 'elective' | 'partition' | 'ultimogeniture' | 'house_elective',
+    );
+    save.chronicle!.push(
+      makeChronicle(save.tickCount ?? 0, 'event', 'Erbfolgegesetz', `Neues Erbrecht: ${data.law}`),
+    );
+    return persist(userId, save);
+  },
+
+  async toggleRealmLaw(data: { lawId: string }) {
+    const { userId, save } = requireSave();
+    ensureRealmSim(save);
+    save.realmSim = setRealmLaw(
+      save.realmSim!,
+      data.lawId as
+        | 'tax_low'
+        | 'tax_normal'
+        | 'tax_high'
+        | 'military_duty'
+        | 'religious_freedom'
+        | 'noble_privileges'
+        | 'peasant_rights'
+        | 'trade_open'
+        | 'serfdom'
+        | 'conscription',
+    );
+    return persist(userId, save);
+  },
+
+  async startTechResearch(data: { techId: string }) {
+    const { userId, save } = requireSave();
+    ensureRealmSim(save);
+    const r = startResearch(save.realmSim!, data.techId);
+    if (r.error) throw new Error(r.error);
+    save.realmSim = r.state;
+    return persist(userId, save);
+  },
+
+  async setTechBudget(data: { gold: number }) {
+    const { userId, save } = requireSave();
+    ensureRealmSim(save);
+    save.realmSim = setResearchBudget(save.realmSim!, data.gold);
+    return persist(userId, save);
+  },
+
+  async grantVassal(data: {
+    name: string;
+    characterId: string;
+    rank: string;
+    provinceIds: string[];
+  }) {
+    const { userId, save } = requireSave();
+    ensureRealmSim(save);
+    const owned = new Set(
+      save.provinces.filter((p) => p.ownerId === save.kingdom.id).map((p) => p.id),
+    );
+    if (data.provinceIds.some((id) => !owned.has(id))) {
+      throw new Error('Nur eigene Provinzen können Vasallen zugewiesen werden');
+    }
+    // Hauptstadt nicht vergeben
+    if (save.capitalProvinceId && data.provinceIds.includes(save.capitalProvinceId)) {
+      throw new Error('Die Hauptstadt bleibt unter direkter Kontrolle');
+    }
+    const r = grantVassal(save.realmSim!, {
+      name: data.name,
+      characterId: data.characterId,
+      rank: data.rank as 'graf' | 'markgraf' | 'herzog' | 'fuerst' | 'koenigsvassal',
+      provinceIds: data.provinceIds,
+    });
+    if (r.error) throw new Error(r.error);
+    save.realmSim = r.state;
+    save.chronicle!.push(
+      makeChronicle(
+        save.tickCount ?? 0,
+        'event',
+        'Vasall ernannt',
+        `${data.name} wird als Vasall eingesetzt.`,
+      ),
+    );
+    return persist(userId, save);
+  },
+
+  async startWonder(data: { wonderId: string; provinceId: string }) {
+    const { userId, save } = requireSave();
+    ensureRealmSim(save);
+    const r = beginWonder(
+      save.realmSim!,
+      data.wonderId as
+        | 'great_cathedral'
+        | 'imperial_palace'
+        | 'great_library'
+        | 'grand_harbor'
+        | 'imperial_fortress'
+        | 'royal_garden',
+      data.provinceId,
+    );
+    if (r.error || !r.cost) throw new Error(r.error ?? 'Wunder fehlgeschlagen');
+    const cost = r.cost;
+    if (
+      save.kingdom.gold < cost.gold ||
+      save.kingdom.wood < cost.wood ||
+      save.kingdom.stone < cost.stone ||
+      save.kingdom.iron < cost.iron
+    ) {
+      throw new Error('Nicht genug Ressourcen für das Wunder');
+    }
+    save.kingdom.gold -= cost.gold;
+    save.kingdom.wood -= cost.wood;
+    save.kingdom.stone -= cost.stone;
+    save.kingdom.iron -= cost.iron;
+    save.realmSim = r.state;
+    const def = WONDERS.find((w) => w.id === data.wonderId);
+    save.chronicle!.push(
+      makeChronicle(
+        save.tickCount ?? 0,
+        'city',
+        `Wunder begonnen: ${def?.name ?? data.wonderId}`,
+        'Die Bauarbeiten am Weltwunder beginnen.',
+      ),
+    );
+    return persist(userId, save);
+  },
+
+  async doPilgrimage() {
+    const { userId, save } = requireSave();
+    ensureRealmSim(save);
+    if (save.kingdom.gold < 40) throw new Error('Nicht genug Gold (40)');
+    save.kingdom.gold -= 40;
+    save.realmSim = doPilgrimage(save.realmSim!);
+    save.kingdom.fame += 2;
+    save.chronicle!.push(
+      makeChronicle(
+        save.tickCount ?? 0,
+        'event',
+        'Pilgerreise',
+        'Der Herrscher pilgert und stärkt seinen Glauben.',
+      ),
+    );
+    return persist(userId, save);
+  },
+
+  async foundKnightOrder(data: { orderId: string }) {
+    const { userId, save } = requireSave();
+    ensureRealmSim(save);
+    if (save.kingdom.gold < 100) throw new Error('Nicht genug Gold (100)');
+    const r = foundKnightOrder(
+      save.realmSim!,
+      data.orderId as 'crown' | 'lion' | 'north',
+    );
+    if (r.error) throw new Error(r.error);
+    save.kingdom.gold -= 100;
+    save.realmSim = r.state;
+    return persist(userId, save);
+  },
+
+  async buildFleet(data: {
+    name: string;
+    provinceId: string;
+    type: string;
+    count: number;
+  }) {
+    const { userId, save } = requireSave();
+    ensureRealmSim(save);
+    const prov = save.provinces.find((p) => p.id === data.provinceId);
+    if (!prov || prov.ownerId !== save.kingdom.id) throw new Error('Provinz nicht im Besitz');
+    if (prov.terrain !== Terrain.COAST && prov.terrain !== 'COAST') {
+      throw new Error('Flotten nur an der Küste');
+    }
+    if (!save.realmSim!.tech.researched.includes('nav_1') && data.type !== 'trade') {
+      // Handelsschiffe ab nav_1; ohne Tech nur 1 Handelsschiff erlauben wenn nav fehlt
+    }
+    if (!save.realmSim!.tech.researched.includes('nav_1')) {
+      throw new Error('Benötigt Technologie: Küstenschifffahrt');
+    }
+    if (data.type === 'war' && !save.realmSim!.tech.researched.includes('nav_2')) {
+      throw new Error('Benötigt Technologie: Hochseeschiffe');
+    }
+    const r = buildFleet(save.realmSim!, {
+      name: data.name || 'Flotte',
+      provinceId: data.provinceId,
+      type: data.type as 'trade' | 'war' | 'transport',
+      count: data.count || 1,
+    });
+    if (r.error) throw new Error(r.error);
+    if (
+      save.kingdom.gold < r.cost.gold ||
+      save.kingdom.wood < r.cost.wood ||
+      save.kingdom.iron < r.cost.iron
+    ) {
+      throw new Error('Nicht genug Ressourcen für die Flotte');
+    }
+    save.kingdom.gold -= r.cost.gold;
+    save.kingdom.wood -= r.cost.wood;
+    save.kingdom.iron -= r.cost.iron;
+    save.realmSim = r.state;
+    return persist(userId, save);
+  },
+
+  async huntPirates() {
+    const { userId, save } = requireSave();
+    ensureRealmSim(save);
+    const r = huntPirates(save.realmSim!);
+    save.realmSim = r.state;
+    save.chronicle!.push(
+      makeChronicle(save.tickCount ?? 0, 'battle', 'Piratenjagd', r.message),
+    );
+    if (r.victory) save.kingdom.fame += 3;
     return persist(userId, save);
   },
 };

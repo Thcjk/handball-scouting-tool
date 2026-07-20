@@ -54,6 +54,14 @@ export default function Layout() {
               Hof
             </NavLink>
             <NavLink
+              to="/realm"
+              className={({ isActive }) =>
+                `px-2 py-1 text-xs sm:text-sm font-display transition-colors ${isActive ? 'text-gold' : 'text-parchment/70 hover:text-gold'}`
+              }
+            >
+              Reich
+            </NavLink>
+            <NavLink
               to="/profile"
               className={({ isActive }) =>
                 `px-2 py-1 text-xs sm:text-sm font-display transition-colors ${isActive ? 'text-gold' : 'text-parchment/70 hover:text-gold'}`

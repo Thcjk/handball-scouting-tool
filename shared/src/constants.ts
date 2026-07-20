@@ -11,7 +11,7 @@ export const STARTING_RESOURCES = {
   fame: 0,
 };
 
-/** Erweiterte Weltkarte (6×5) – CK3/OpenFront-inspirierte Provinzen */
+/** Erweiterte Weltkarte (Basis 6×5, Phase 5 erweitert nach Süden/Westen) */
 export const WORLD_PROVINCES: ProvinceSeed[] = [
   // y=0 Norden
   { name: 'Nordmark', x: 0, y: 0, terrain: Terrain.PLAINS, population: 1200, neighbors: ['Westhain', 'Ostfeld', 'Eiskante'] },

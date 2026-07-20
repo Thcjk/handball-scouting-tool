@@ -785,6 +785,141 @@ function driftRelations(world: SimWorld) {
   }
 }
 
+/**
+ * Phase 5.1 – Reiche entstehen und zerfallen unabhängig vom Spieler.
+ * Schwache KI-Reiche können kollabieren; bei genug Neutralraum entsteht ein neues.
+ */
+function processRealmDynamics(world: SimWorld): void {
+  // Zerfall: keine Provinzen mehr
+  const gone = world.aiKingdoms.filter(
+    (k) => world.provinces.filter((p) => p.ownerId === k.id).length === 0,
+  );
+  for (const k of gone) {
+    world.chronicle.push(
+      makeChronicle(
+        world.tickCount,
+        'death',
+        `${k.name} erlischt`,
+        `Das Reich ${k.name} verschwindet von der Landkarte.`,
+      ),
+    );
+    world.wars = world.wars.filter((w) => w.attackerId !== k.id && w.defenderId !== k.id);
+    world.armies = world.armies.filter((a) => a.kingdomId !== k.id);
+    world.generals = world.generals.filter((g) => g.kingdomId !== k.id);
+  }
+  if (gone.length) {
+    world.aiKingdoms = world.aiKingdoms.filter((k) => !gone.some((g) => g.id === k.id));
+  }
+
+  // Kollaps durch Schwäche (selten)
+  for (const k of [...world.aiKingdoms]) {
+    const owned = world.provinces.filter((p) => p.ownerId === k.id);
+    if (owned.length === 0) continue;
+    const weak = owned.length <= 1 && k.gold < 25 && k.food < 40;
+    const overstretched = owned.length >= 6 && k.gold < 15 && Math.random() < 0.08;
+    if ((weak && Math.random() < 0.06) || overstretched) {
+      for (const p of owned) {
+        p.ownerId = null;
+        p.ownerName = null;
+      }
+      world.armies = world.armies.filter((a) => a.kingdomId !== k.id);
+      world.wars = world.wars.filter((w) => w.attackerId !== k.id && w.defenderId !== k.id);
+      world.aiKingdoms = world.aiKingdoms.filter((x) => x.id !== k.id);
+      world.chronicle.push(
+        makeChronicle(
+          world.tickCount,
+          'disaster',
+          `${k.name} zerfällt`,
+          `Hungersnot und schlechte Herrschaft zerschlagen ${k.name}. Provinzen werden herrenlos.`,
+        ),
+      );
+    }
+  }
+
+  // Neues Reich aus Neutralraum (wenn weniger als 4 KI)
+  if (world.aiKingdoms.length < 4 && Math.random() < 0.04) {
+    const neutrals = world.provinces
+      .filter((p) => !p.ownerId)
+      .sort((a, b) => b.population - a.population);
+    if (neutrals.length >= 2) {
+      const used = new Set(world.aiKingdoms.map((k) => k.name));
+      const tpl = AI_KINGDOMS.find((t) => !used.has(t.name)) ?? AI_KINGDOMS[world.aiKingdoms.length % AI_KINGDOMS.length];
+      const capital = neutrals[0];
+      const personality = personalityFromTraits([...tpl.traits]);
+      const ruler = makeCharacter(tpl.rulerName, 32 + Math.floor(Math.random() * 15), {
+        ruler: true,
+        traits: [...tpl.traits],
+      });
+      const heir = makeCharacter(`${tpl.rulerName.split(' ')[0]} II.`, 10, {
+        heir: true,
+        traits: ['ehrgeizig'],
+      });
+      const kid = uid();
+      capital.ownerId = kid;
+      capital.ownerName = tpl.name;
+      capital.culture = tpl.culture;
+      capital.religion = tpl.religion;
+      capital.castle = { level: 1 };
+      capital.village = { level: 1 };
+      capital.defense = 18;
+      const neighbor = neutrals.find((p) => capital.neighborSlugs.includes(p.slug));
+      if (neighbor) {
+        neighbor.ownerId = kid;
+        neighbor.ownerName = tpl.name;
+        neighbor.village = { level: 1 };
+        neighbor.castle = { level: 1 };
+      }
+      world.armies.push({
+        id: uid(),
+        name: `Garnison ${capital.name}`,
+        provinceId: capital.id,
+        morale: 90,
+        isGarrison: true,
+        kingdomId: kid,
+        units: [
+          { id: uid(), type: 'MILITIA', count: 8 },
+          { id: uid(), type: 'SPEARMAN', count: 4 },
+        ],
+      });
+      world.aiKingdoms.push({
+        id: kid,
+        name: tpl.name,
+        personality,
+        culture: tpl.culture,
+        religion: tpl.religion,
+        gold: 80,
+        food: 100,
+        wood: 40,
+        stone: 30,
+        iron: 20,
+        influence: 15,
+        fame: 5,
+        capitalProvinceId: capital.id,
+        ruler,
+        heir,
+        characters: [ruler, heir],
+        spies: 1,
+        ageTick: 0,
+      });
+      adjustOpinion(
+        world.relations,
+        world.playerKingdomId,
+        kid,
+        -5 + Math.floor(Math.random() * 15),
+        'Aufstieg',
+      );
+      world.chronicle.push(
+        makeChronicle(
+          world.tickCount,
+          'coronation',
+          `${tpl.name} entsteht`,
+          `Aus den herrenlosen Landen erhebt sich ${tpl.name} unter ${tpl.rulerName}.`,
+        ),
+      );
+    }
+  }
+}
+
 /** Ein voller Welt-Tick (nach Spieler-Wirtschaft) */
 export function simulateWorldTick(world: SimWorld): { successionMsg?: string; warAlert?: string } {
   spawnAiKingdoms(world);
@@ -810,6 +945,7 @@ export function simulateWorldTick(world: SimWorld): { successionMsg?: string; wa
   processSieges(world);
   driftRelations(world);
   ageDynasties(world);
+  processRealmDynamics(world);
 
   // Ereignis für Spieler (max 1 pending)
   if (world.pendingEvents.length === 0) {

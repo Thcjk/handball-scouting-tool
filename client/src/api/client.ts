@@ -137,6 +137,28 @@ const remoteApi = {
   assignCouncil: (data: { role: string; characterId: string | null }) =>
     request<GameState>('/game/dynasty/council', { method: 'POST', body: JSON.stringify(data) }),
   hostTournament: () => request<GameState>('/game/dynasty/tournament', { method: 'POST', body: '{}' }),
+  setSuccessionLaw: (data: { law: string }) =>
+    request<GameState>('/game/realm/succession', { method: 'POST', body: JSON.stringify(data) }),
+  toggleRealmLaw: (data: { lawId: string }) =>
+    request<GameState>('/game/realm/law', { method: 'POST', body: JSON.stringify(data) }),
+  startTechResearch: (data: { techId: string }) =>
+    request<GameState>('/game/realm/research', { method: 'POST', body: JSON.stringify(data) }),
+  setTechBudget: (data: { gold: number }) =>
+    request<GameState>('/game/realm/research-budget', { method: 'POST', body: JSON.stringify(data) }),
+  grantVassal: (data: {
+    name: string;
+    characterId: string;
+    rank: string;
+    provinceIds: string[];
+  }) => request<GameState>('/game/realm/vassal', { method: 'POST', body: JSON.stringify(data) }),
+  startWonder: (data: { wonderId: string; provinceId: string }) =>
+    request<GameState>('/game/realm/wonder', { method: 'POST', body: JSON.stringify(data) }),
+  doPilgrimage: () => request<GameState>('/game/realm/pilgrimage', { method: 'POST', body: '{}' }),
+  foundKnightOrder: (data: { orderId: string }) =>
+    request<GameState>('/game/realm/order', { method: 'POST', body: JSON.stringify(data) }),
+  buildFleet: (data: { name: string; provinceId: string; type: string; count: number }) =>
+    request<GameState>('/game/realm/fleet', { method: 'POST', body: JSON.stringify(data) }),
+  huntPirates: () => request<GameState>('/game/realm/pirates', { method: 'POST', body: '{}' }),
 };
 
 import { localApi } from '../local/localApi';
@@ -474,6 +496,106 @@ export interface GameState {
       renown: number;
       foundedYear: number;
       famousMembers: string[];
+    };
+  };
+  realm?: {
+    laws: { succession: string; active: string[] };
+    tech: { researched: string[]; progress: Record<string, number>; researching: string | null };
+    faith: {
+      piety: number;
+      religionId: string;
+      relics: number;
+      orders: Array<{
+        id: string;
+        name: string;
+        founded: boolean;
+        strength: number;
+        loyalty: number;
+      }>;
+    };
+    vassals: Array<{
+      id: string;
+      name: string;
+      rank: string;
+      provinceIds: string[];
+      loyalty: number;
+      power: number;
+      opinion: number;
+      gold: number;
+      troops: number;
+      goals: string;
+      lastAction?: string;
+    }>;
+    wonders: Array<{
+      id: string;
+      wonderId: string;
+      provinceId: string;
+      remainingTicks: number;
+      completed: boolean;
+    }>;
+    fleets: Array<{
+      id: string;
+      name: string;
+      provinceId: string;
+      ships: Array<{ type: string; count: number }>;
+      morale: number;
+    }>;
+    seaRoutes: Array<{
+      id: string;
+      fromProvinceId: string;
+      toProvinceId: string;
+      goods: string;
+      goldPerTick: number;
+      disrupted: boolean;
+    }>;
+    pirates: Array<{ id: string; region: string; strength: number; active: boolean }>;
+    civilWar: {
+      active: boolean;
+      reason: string;
+      startedTick: number;
+      factions: Array<{ id: string; name: string; leaderName: string; strength: number }>;
+    } | null;
+    researchBudget: number;
+    civilWarRisk: number;
+    civilWarReason: string;
+    catalog: {
+      regions: Array<{
+        id: string;
+        name: string;
+        culture: string;
+        religion: string;
+        architecture: string;
+        resources: string[];
+        description: string;
+      }>;
+      successionLaws: Array<{
+        id: string;
+        name: string;
+        description: string;
+        stability: number;
+        civilWarRisk: number;
+      }>;
+      realmLaws: Array<{ id: string; name: string; description: string }>;
+      techTree: Array<{
+        id: string;
+        name: string;
+        branch: string;
+        cost: number;
+        requires?: string[];
+        unlocks: string;
+      }>;
+      techBranchLabel: Record<string, string>;
+      wonders: Array<{
+        id: string;
+        name: string;
+        description: string;
+        cost: { gold: number; wood: number; stone: number; iron: number };
+        buildTicks: number;
+        requiresTech?: string;
+      }>;
+      religions: Array<{ id: string; name: string; bonus: string; feast: string }>;
+      vassalRanks: Record<string, string>;
+      shipCosts: Record<string, { gold: number; wood: number; iron: number }>;
     };
   };
 }
