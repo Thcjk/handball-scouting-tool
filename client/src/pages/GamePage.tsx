@@ -9,9 +9,12 @@ import ProvincePanel from '../components/ProvincePanel';
 import CharacterPanel from '../components/CharacterPanel';
 import CityView from '../components/CityView';
 import IntroOverlay from '../components/IntroOverlay';
+import TutorialOverlay from '../components/TutorialOverlay';
+import TipBanner from '../components/TipBanner';
 import EventModal from '../components/EventModal';
 import AtmosphereAudio from '../components/AtmosphereAudio';
 import { buildIntroStory, INTRO_SEEN_KEY } from '../lore/intro';
+import { TUTORIAL_DONE_KEY } from '../lore/helpContent';
 
 export default function GamePage() {
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -25,6 +28,7 @@ export default function GamePage() {
   const [showPanel, setShowPanel] = useState(true);
   const [cityViewId, setCityViewId] = useState<string | null>(null);
   const [showIntro, setShowIntro] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const loadGame = useCallback(async () => {
     try {
@@ -46,18 +50,38 @@ export default function GamePage() {
   }, [loadGame]);
 
   useEffect(() => {
-    if (!gameState) return;
-    const key = `${INTRO_SEEN_KEY}_${gameState.kingdom.id}`;
-    if (!localStorage.getItem(key)) {
+    if (!gameState?.kingdom.id) return;
+    const introKey = `${INTRO_SEEN_KEY}_${gameState.kingdom.id}`;
+    if (!localStorage.getItem(introKey)) {
       setShowIntro(true);
+      return;
     }
-  }, [gameState]);
+    if (localStorage.getItem(TUTORIAL_DONE_KEY) !== '1') {
+      setShowTutorial(true);
+    }
+    // Nur bei neuem Königreich / erstem Load prüfen
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- kingdom.id ist der Trigger
+  }, [gameState?.kingdom.id]);
+
+  useEffect(() => {
+    if (!showTutorial || !isOfflineMode) return;
+    void api.setGameSpeed({ speed: 'pause' }).then(setGameState).catch(() => undefined);
+  }, [showTutorial]);
 
   const dismissIntro = () => {
     if (gameState) {
       localStorage.setItem(`${INTRO_SEEN_KEY}_${gameState.kingdom.id}`, '1');
     }
     setShowIntro(false);
+    if (localStorage.getItem(TUTORIAL_DONE_KEY) !== '1') {
+      setShowTutorial(true);
+    }
+  };
+
+  const finishTutorial = () => {
+    localStorage.setItem(TUTORIAL_DONE_KEY, '1');
+    setShowTutorial(false);
+    void api.setGameSpeed({ speed: 'normal' }).then(setGameState).catch(() => undefined);
   };
 
   useEffect(() => {
@@ -181,6 +205,12 @@ export default function GamePage() {
           onContinue={dismissIntro}
         />
       )}
+
+      {showTutorial && !showIntro && (
+        <TutorialOverlay onFinish={finishTutorial} onSkip={finishTutorial} />
+      )}
+
+      {!showIntro && !showTutorial && <TipBanner gameState={gameState} />}
 
       {/* Ressourcen-HUD oben */}
       <div className="shrink-0 px-3 py-1.5 bg-black/40 border-b border-gold/20 flex flex-wrap items-center justify-between gap-2">

@@ -25,11 +25,12 @@ Mittelalter-Strategiespiel – **direkt im Browser**, ohne Server, ohne Installa
 - **Großes Königreich**: Vasallen, Gesetze, Forschung, Weltwunder, Flotten, Piraten, Religion, Bürgerkriege
 - **Gesellschaft**: Adel, Fraktionen, Spione, Quests, Turniere, Söldner, Helden, Weltmarkt, Jahreszeiten
 - **Endgame & Codex**: Invasionen, Krisen, Weltgeschichte, Erfolge, Statistik, Spielgeschwindigkeit, Multi-Saves
+- **Tutorial & Tipps**: Einsteiger-Tutorial nach dem Start, laufende Hinweise auf der Karte
 - Charakter-Panel mit Porträt, Eigenschaften und Fähigkeiten
 - Burgen, Städte, Dörfer ausbauen, Armeen auf der Karte
 - Dynastien, Thronfolge & automatisches Speichern
 
-Details: [docs/cities.md](docs/cities.md) · [docs/phase2.md](docs/phase2.md) · [docs/phase3.md](docs/phase3.md) · [docs/phase4.md](docs/phase4.md) · [docs/phase5-part1.md](docs/phase5-part1.md) · [docs/phase5-part2.md](docs/phase5-part2.md) · [docs/phase5-part3.md](docs/phase5-part3.md)
+Details: [docs/cities.md](docs/cities.md) · [docs/phase2.md](docs/phase2.md) · [docs/phase3.md](docs/phase3.md) · [docs/phase4.md](docs/phase4.md) · [docs/phase5-part1.md](docs/phase5-part1.md) · [docs/phase5-part2.md](docs/phase5-part2.md) · [docs/phase5-part3.md](docs/phase5-part3.md) · [docs/tutorial.md](docs/tutorial.md)
 
 ---
 

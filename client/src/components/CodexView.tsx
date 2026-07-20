@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, type GameState } from '../api/client';
 import {
   GAME_TIPS,
   GLOSSARY,
   SHORTCUTS,
+  TUTORIAL_DONE_KEY,
   TUTORIAL_STEPS,
+  TIP_DISMISS_KEY,
 } from '../lore/helpContent';
 
 interface Props {
@@ -15,6 +18,7 @@ interface Props {
 type Tab = 'stats' | 'history' | 'achievements' | 'crisis' | 'help' | 'saves';
 
 export default function CodexView({ gameState, onUpdate }: Props) {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('stats');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -249,6 +253,21 @@ export default function CodexView({ gameState, onUpdate }: Props) {
       {tab === 'help' && (
         <div className="panel parchment-frame p-3 space-y-4">
           <div className="panel-header">Tutorial</div>
+          <button
+            type="button"
+            className="btn-primary text-[11px]"
+            onClick={() => {
+              localStorage.removeItem(TUTORIAL_DONE_KEY);
+              localStorage.removeItem(TIP_DISMISS_KEY);
+              navigate('/game');
+              window.location.reload();
+            }}
+          >
+            Tutorial erneut starten
+          </button>
+          <p className="text-[11px] text-parchment/50">
+            Startet das Einsteiger-Tutorial neu (lädt die Karte).
+          </p>
           {TUTORIAL_STEPS.map((s) => (
             <div key={s.id} className="text-xs">
               <div className="text-gold font-display">{s.title}</div>

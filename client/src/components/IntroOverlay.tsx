@@ -54,9 +54,12 @@ export default function IntroOverlay({
         <h2 className="font-display text-gold text-xl">Chronik beginnt</h2>
         <p className="text-parchment/90 text-sm leading-relaxed whitespace-pre-line">{story}</p>
         <p className="text-xs text-parchment/50 italic">Herrscher: {rulerName}</p>
+        <p className="text-[11px] text-amber-200/70">
+          Danach folgt ein kurzes Tutorial mit den wichtigsten Schritten.
+        </p>
 
         <button type="button" className="btn-primary w-full" onClick={onContinue}>
-          Die Herrschaft antreten
+          Weiter zum Tutorial
         </button>
       </div>
     </div>
