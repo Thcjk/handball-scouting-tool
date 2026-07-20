@@ -25,6 +25,8 @@ interface WorldMapProps {
   selectedId: string | null;
   onSelect: (province: Province) => void;
   mapMode?: 'terrain' | 'political';
+  season?: string;
+  weather?: string;
 }
 
 const AMBIENT_GLYPH: Record<string, string> = {
@@ -36,6 +38,31 @@ const AMBIENT_GLYPH: Record<string, string> = {
   flag: '🚩',
   boat: '⛵',
   hunter: '🏹',
+  child: '🧒',
+  cart: '🛒',
+  knight: '⚔️',
+  wolf: '🐺',
+  deer: '🦌',
+  bear: '🐻',
+  cow: '🐄',
+  horse: '🐴',
+  bell: '🔔',
+};
+
+const SEASON_TINT: Record<string, string> = {
+  spring: 'rgba(80, 140, 60, 0.08)',
+  summer: 'rgba(220, 180, 40, 0.07)',
+  autumn: 'rgba(180, 90, 30, 0.12)',
+  winter: 'rgba(200, 220, 240, 0.18)',
+};
+
+const WEATHER_TINT: Record<string, string> = {
+  rain: 'rgba(60, 80, 110, 0.12)',
+  snow: 'rgba(255, 255, 255, 0.15)',
+  storm: 'rgba(40, 40, 60, 0.2)',
+  fog: 'rgba(180, 180, 190, 0.14)',
+  thunder: 'rgba(50, 40, 80, 0.16)',
+  sunny: 'transparent',
 };
 
 export default function WorldMap({
@@ -44,6 +71,8 @@ export default function WorldMap({
   selectedId,
   onSelect,
   mapMode = 'political',
+  season,
+  weather,
 }: WorldMapProps) {
   const [transform, setTransform] = useState({ x: 24, y: 16, scale: 0.9 });
   const dragging = useRef(false);
@@ -79,9 +108,11 @@ export default function WorldMap({
           y: p.y,
           terrain: p.terrain,
           isOwned: p.isOwned,
+          hasCity: !!(p.city && p.city.level > 0),
         })),
+        season,
       ),
-    [provinces],
+    [provinces, season],
   );
 
   const onWheel = (e: React.WheelEvent) => {
@@ -117,10 +148,18 @@ export default function WorldMap({
 
   return (
     <div className="world-map-shell relative w-full h-full overflow-hidden">
+      <div
+        className="pointer-events-none absolute inset-0 z-10"
+        style={{
+          background: `linear-gradient(180deg, ${SEASON_TINT[season ?? ''] ?? 'transparent'}, ${WEATHER_TINT[weather ?? 'sunny'] ?? 'transparent'})`,
+        }}
+      />
       <div className="absolute top-2 left-2 z-20 panel px-2 py-1 text-[10px] text-parchment/70 pointer-events-none">
         {lod === 'far' && 'Reichsübersicht'}
         {lod === 'mid' && 'Provinzen & Straßen'}
         {lod === 'near' && 'Nahsicht – Felder & Leben'}
+        {season ? ` · ${season}` : ''}
+        {weather ? ` · ${weather}` : ''}
       </div>
 
       <div className="absolute top-2 right-2 z-20 flex gap-1">

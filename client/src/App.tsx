@@ -9,6 +9,7 @@ import ProfilePage from './pages/ProfilePage';
 import ChroniclePage from './pages/ChroniclePage';
 import CourtPage from './pages/CourtPage';
 import RealmPage from './pages/RealmPage';
+import SocietyPage from './pages/SocietyPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -63,6 +64,7 @@ export default function App() {
         <Route path="chronicle" element={<ChroniclePage />} />
         <Route path="court" element={<CourtPage />} />
         <Route path="realm" element={<RealmPage />} />
+        <Route path="society" element={<SocietyPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

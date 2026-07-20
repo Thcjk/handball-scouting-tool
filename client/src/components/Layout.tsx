@@ -62,6 +62,14 @@ export default function Layout() {
               Reich
             </NavLink>
             <NavLink
+              to="/society"
+              className={({ isActive }) =>
+                `px-2 py-1 text-xs sm:text-sm font-display transition-colors ${isActive ? 'text-gold' : 'text-parchment/70 hover:text-gold'}`
+              }
+            >
+              Welt
+            </NavLink>
+            <NavLink
               to="/profile"
               className={({ isActive }) =>
                 `px-2 py-1 text-xs sm:text-sm font-display transition-colors ${isActive ? 'text-gold' : 'text-parchment/70 hover:text-gold'}`

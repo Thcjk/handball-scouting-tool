@@ -127,7 +127,16 @@ export type AmbientKind =
   | 'smoke'
   | 'flag'
   | 'boat'
-  | 'hunter';
+  | 'hunter'
+  | 'child'
+  | 'cart'
+  | 'knight'
+  | 'wolf'
+  | 'deer'
+  | 'bear'
+  | 'cow'
+  | 'horse'
+  | 'bell';
 
 export interface AmbientActor {
   id: string;
@@ -138,24 +147,35 @@ export interface AmbientActor {
   duration: number;
 }
 
-/** Deterministische Ambient-Akteure (max. ~24 für Performance) */
+/** Deterministische Ambient-Akteure (max. ~36 für Performance) */
 export function buildAmbientActors(
-  provinces: Array<{ id: string; name: string; x: number; y: number; terrain: string; isOwned?: boolean }>,
+  provinces: Array<{
+    id: string;
+    name: string;
+    x: number;
+    y: number;
+    terrain: string;
+    isOwned?: boolean;
+    hasCity?: boolean;
+  }>,
+  season?: string,
 ): AmbientActor[] {
   const actors: AmbientActor[] = [];
   let i = 0;
   for (const p of provinces) {
     const seed = nameSeed(p.name);
     const { cx, cy } = provinceCenter(p.x, p.y);
-    if (hash(seed) > 0.45 && i < 24) {
+    if (hash(seed) > 0.4 && i < 30) {
       const kindPool: AmbientKind[] =
         p.terrain === 'FOREST'
-          ? ['hunter', 'peasant', 'smoke']
+          ? ['hunter', 'peasant', 'smoke', 'wolf', 'deer']
           : p.terrain === 'COAST'
-            ? ['boat', 'merchant', 'smoke']
+            ? ['boat', 'merchant', 'smoke', 'cart']
             : p.terrain === 'PLAINS'
-              ? ['sheep', 'peasant', 'merchant']
-              : ['soldier', 'flag', 'smoke'];
+              ? ['sheep', 'peasant', 'merchant', 'cow', 'horse', 'child']
+              : p.terrain === 'MOUNTAINS'
+                ? ['soldier', 'flag', 'smoke', 'bear']
+                : ['soldier', 'flag', 'smoke', 'deer'];
       const kind = kindPool[Math.floor(hash(seed + 3) * kindPool.length)];
       actors.push({
         id: `a-${p.id}`,
@@ -167,7 +187,7 @@ export function buildAmbientActors(
       });
       i++;
     }
-    if (p.isOwned && hash(seed + 9) > 0.3 && i < 28) {
+    if (p.isOwned && hash(seed + 9) > 0.3 && i < 34) {
       actors.push({
         id: `f-${p.id}`,
         kind: 'flag',
@@ -175,6 +195,32 @@ export function buildAmbientActors(
         y: cy - 28,
         delay: 0,
         duration: 2.5,
+      });
+      i++;
+    }
+    // Lebendige Städte
+    if (p.hasCity && i < 36) {
+      const cityKinds: AmbientKind[] = ['merchant', 'child', 'cart', 'knight', 'bell', 'smoke'];
+      const ck = cityKinds[Math.floor(hash(seed + 11) * cityKinds.length)];
+      actors.push({
+        id: `c-${p.id}`,
+        kind: ck,
+        x: cx + (hash(seed + 12) - 0.5) * 30,
+        y: cy + 10 + hash(seed + 13) * 16,
+        delay: hash(seed + 14) * 2,
+        duration: 5 + hash(seed + 15) * 4,
+      });
+      i++;
+    }
+    // Winter: weniger Tiere auf offenen Feldern
+    if (season === 'winter' && (p.terrain === 'PLAINS' || p.terrain === 'HILLS') && hash(seed + 20) > 0.7 && i < 38) {
+      actors.push({
+        id: `w-${p.id}`,
+        kind: 'smoke',
+        x: cx - 12,
+        y: cy - 8,
+        delay: 1,
+        duration: 4,
       });
       i++;
     }

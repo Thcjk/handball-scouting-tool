@@ -17,6 +17,9 @@ const VISITOR_LABEL: Record<string, string> = {
   bard: 'Barde',
   pilgrim: 'Pilger',
   artist: 'Künstler',
+  scholar: 'Gelehrter',
+  craftsman: 'Handwerker',
+  adventurer: 'Abenteurer',
 };
 
 interface Props {

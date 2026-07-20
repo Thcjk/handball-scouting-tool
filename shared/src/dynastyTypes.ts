@@ -107,10 +107,21 @@ export interface MarriageRecord {
 export interface CourtVisitor {
   id: string;
   name: string;
-  kind: 'ambassador' | 'merchant' | 'knight' | 'bard' | 'pilgrim' | 'artist';
+  kind:
+    | 'ambassador'
+    | 'merchant'
+    | 'knight'
+    | 'bard'
+    | 'pilgrim'
+    | 'artist'
+    | 'scholar'
+    | 'craftsman'
+    | 'adventurer';
   description: string;
   arrivedTick: number;
   expiresTick: number;
+  /** Optional: Quest-Hinweis vom Besucher */
+  offersQuest?: boolean;
 }
 
 export interface CouncilSlot {

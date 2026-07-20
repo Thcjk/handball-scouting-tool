@@ -159,6 +159,21 @@ const remoteApi = {
   buildFleet: (data: { name: string; provinceId: string; type: string; count: number }) =>
     request<GameState>('/game/realm/fleet', { method: 'POST', body: JSON.stringify(data) }),
   huntPirates: () => request<GameState>('/game/realm/pirates', { method: 'POST', body: '{}' }),
+  startSocietySpy: (data: { type: string; targetName: string }) =>
+    request<GameState>('/game/society/spy', { method: 'POST', body: JSON.stringify(data) }),
+  hireMercenary: (data: { defId: string; provinceId: string }) =>
+    request<GameState>('/game/society/mercenary', { method: 'POST', body: JSON.stringify(data) }),
+  hireHero: (data: { kind: string }) =>
+    request<GameState>('/game/society/hero', { method: 'POST', body: JSON.stringify(data) }),
+  startRealmTournament: (data: { discipline: string; participate: boolean }) =>
+    request<GameState>('/game/society/tournament', { method: 'POST', body: JSON.stringify(data) }),
+  appeaseFaction: (data: { factionId: string; gold: number }) =>
+    request<GameState>('/game/society/faction', { method: 'POST', body: JSON.stringify(data) }),
+  marketTrade: (data: { good: string; amount: number; buy: boolean }) =>
+    request<GameState>('/game/society/trade', { method: 'POST', body: JSON.stringify(data) }),
+  fightBandits: () => request<GameState>('/game/society/bandits', { method: 'POST', body: '{}' }),
+  increaseRulerGuard: () =>
+    request<GameState>('/game/society/guard', { method: 'POST', body: '{}' }),
 };
 
 import { localApi } from '../local/localApi';
@@ -596,6 +611,104 @@ export interface GameState {
       religions: Array<{ id: string; name: string; bonus: string; feast: string }>;
       vassalRanks: Record<string, string>;
       shipCosts: Record<string, { gold: number; wood: number; iron: number }>;
+    };
+  };
+  society?: {
+    houses: Array<{
+      id: string;
+      name: string;
+      rank: string;
+      motto: string;
+      coat: string;
+      wealth: number;
+      land: number;
+      prestige: number;
+      loyalty: number;
+      goal: string;
+      members: number;
+    }>;
+    factions: Array<{
+      id: string;
+      name: string;
+      influence: number;
+      loyalty: number;
+      demand: string;
+      goal: string;
+    }>;
+    spies: Array<{
+      id: string;
+      name: string;
+      skill: number;
+      experience: number;
+      busyUntilTick: number;
+      alive: boolean;
+    }>;
+    spyOps: Array<{
+      id: string;
+      type: string;
+      targetName: string;
+      progress: number;
+      targetTicks: number;
+    }>;
+    quests: Array<{
+      id: string;
+      kind: string;
+      title: string;
+      description: string;
+      costGold: number;
+      expiresTick: number;
+    }>;
+    tournament: {
+      active: boolean;
+      discipline: string;
+      participants: string[];
+      winner?: string;
+      ticksLeft: number;
+      playerParticipates: boolean;
+    } | null;
+    mercenaries: Array<{
+      id: string;
+      name: string;
+      troops: number;
+      morale: number;
+      wage: number;
+      provinceId: string;
+    }>;
+    heroes: Array<{
+      id: string;
+      kind: string;
+      name: string;
+      title: string;
+      ability: string;
+      loyalty: number;
+    }>;
+    prices: Record<string, number>;
+    fair: { active: boolean; cityName: string; ticksLeft: number; kind: string } | null;
+    climate: { season: string; weather: string; monthInYear: number };
+    disasters: Array<{ id: string; kind: string; provinceName: string; ticksLeft: number }>;
+    diseases: Array<{
+      id: string;
+      kind: string;
+      provinceName: string;
+      severity: number;
+      ticksLeft: number;
+    }>;
+    bandits: Array<{ id: string; regionName: string; strength: number; active: boolean }>;
+    wildlife: Array<{ id: string; kind: string; provinceId: string; count: number }>;
+    atmosphere: string;
+    rulerProtection: number;
+    pendingAssassination: string | null;
+    catalog: {
+      seasons: Record<string, string>;
+      weather: Record<string, string>;
+      atmosphere: Record<string, string>;
+      spyMissions: Array<{ id: string; name: string; cost: number; description: string }>;
+      tournaments: Array<{ id: string; name: string; cost: number }>;
+      mercenaries: Array<{ id: string; name: string; hireCost: number; wage: number }>;
+      heroes: Array<{ kind: string; title: string; ability: string; hireCost: number }>;
+      marketGoods: Record<string, string>;
+      nobleRanks: Record<string, string>;
+      wildlife: Record<string, string>;
     };
   };
 }

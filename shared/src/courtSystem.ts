@@ -53,6 +53,9 @@ const VISITOR_KINDS: CourtVisitor['kind'][] = [
   'bard',
   'pilgrim',
   'artist',
+  'scholar',
+  'craftsman',
+  'adventurer',
 ];
 
 const VISITOR_TEXT: Record<CourtVisitor['kind'], string[]> = {
@@ -62,6 +65,9 @@ const VISITOR_TEXT: Record<CourtVisitor['kind'], string[]> = {
   bard: ['Ein Barde will eure Taten besingen.', 'Spielleute bitten um ein Fest.'],
   pilgrim: ['Pilger bitten um Obdach und Segen.', 'Eine Prozession zieht durchs Land.'],
   artist: ['Ein Bildhauer will eine Statue errichten.', 'Ein Maler sucht einen Auftrag für den Saal.'],
+  scholar: ['Ein Gelehrter bringt alte Schriften.', 'Ein Chronist will eure Geschichte aufzeichnen.'],
+  craftsman: ['Ein Meisterhandwerker sucht einen Auftrag.', 'Ein Zimmermann bietet seine Dienste an.'],
+  adventurer: ['Ein Abenteurer erzählt von fernen Ländernen.', 'Ein Entdecker bringt seltsame Karten.'],
 };
 
 const NAMES = [
@@ -80,7 +86,7 @@ const NAMES = [
 ];
 
 export function rollCourtVisitor(tick: number): CourtVisitor | null {
-  if (Math.random() > 0.22) return null;
+  if (Math.random() > 0.28) return null;
   const kind = VISITOR_KINDS[Math.floor(Math.random() * VISITOR_KINDS.length)];
   const texts = VISITOR_TEXT[kind];
   return {
@@ -90,6 +96,7 @@ export function rollCourtVisitor(tick: number): CourtVisitor | null {
     description: texts[Math.floor(Math.random() * texts.length)],
     arrivedTick: tick,
     expiresTick: tick + 8 + Math.floor(Math.random() * 6),
+    offersQuest: Math.random() < 0.35,
   };
 }
 
@@ -101,6 +108,9 @@ export function visitorKindLabel(kind: CourtVisitor['kind']): string {
     bard: 'Barde',
     pilgrim: 'Pilger',
     artist: 'Künstler',
+    scholar: 'Gelehrter',
+    craftsman: 'Handwerker',
+    adventurer: 'Abenteurer',
   };
   return map[kind];
 }

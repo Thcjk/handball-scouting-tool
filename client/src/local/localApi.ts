@@ -101,6 +101,23 @@ import {
   startResearch,
   type RealmSimState,
 } from './realmSim';
+import {
+  defaultSocietySim,
+  migrateSocietyState,
+  pickQuestEvent,
+  runSocietyTick,
+  societyAcceptQuest,
+  societyAppeaseFaction,
+  societyFightBandits,
+  societyHireHero,
+  societyHireMerc,
+  societyIncreaseProtection,
+  societyStartSpy,
+  societyStartTournament,
+  societyTrade,
+  societyUiCatalog,
+  type SocietySimState,
+} from './societySim';
 
 const USERS_KEY = 'kronenchronik_users';
 const SESSION_KEY = 'kronenchronik_session';
@@ -198,6 +215,8 @@ interface GameSave {
   /** Phase 5.1 – Großes Königreich */
   realmSim?: RealmSimState;
   worldExpanded?: boolean;
+  /** Phase 5.2 – Gesellschaft & Atmosphäre */
+  societySim?: SocietySimState;
 }
 
 function saveKey(userId: string) {
@@ -306,6 +325,11 @@ function ensureWorldFields(save: GameSave) {
   ensureDynastySim(save);
   expandWorldIfNeeded(save);
   ensureRealmSim(save);
+  ensureSocietySim(save);
+}
+
+function ensureSocietySim(save: GameSave) {
+  save.societySim = migrateSocietyState(save.societySim, save.tickCount ?? 0);
 }
 
 function ensureRealmSim(save: GameSave) {
@@ -618,6 +642,7 @@ function createNewSave(kingdomName: string, rulerName: string): GameSave {
     realmSim: defaultRealmSim(
       provinces.filter((p) => p.terrain === Terrain.COAST || p.terrain === 'COAST').map((p) => p.id),
     ),
+    societySim: defaultSocietySim(0),
   };
 }
 
@@ -784,6 +809,29 @@ function toGameState(save: GameSave): GameState {
           civilWarRisk: save.realmSim.lastCivilWarRisk,
           civilWarReason: save.realmSim.lastCivilWarReason,
           catalog: realmUiCatalog(),
+        }
+      : undefined,
+    society: save.societySim
+      ? {
+          houses: save.societySim.houses,
+          factions: save.societySim.factions,
+          spies: save.societySim.spies.filter((s) => s.alive),
+          spyOps: save.societySim.spyOps,
+          quests: save.societySim.quests,
+          tournament: save.societySim.tournament,
+          mercenaries: save.societySim.mercenaries,
+          heroes: save.societySim.heroes,
+          prices: { ...save.societySim.prices } as Record<string, number>,
+          fair: save.societySim.fair,
+          climate: save.societySim.climate,
+          disasters: save.societySim.disasters,
+          diseases: save.societySim.diseases,
+          bandits: save.societySim.bandits.filter((b) => b.active),
+          wildlife: save.societySim.wildlife,
+          atmosphere: save.societySim.atmosphere,
+          rulerProtection: save.societySim.rulerProtection,
+          pendingAssassination: save.societySim.pendingAssassination ?? null,
+          catalog: societyUiCatalog(),
         }
       : undefined,
   };
@@ -971,6 +1019,63 @@ export function applyResourceTick(userId: string): GameState | null {
   save.kingdom.food = Math.max(0, save.kingdom.food + realm.foodDelta);
   save.kingdom.fame += realm.fameDelta;
   if (realm.alert) save.lastWorldAlert = realm.alert;
+
+  // Phase 5.2: Gesellschaft & Atmosphäre
+  ensureSocietySim(save);
+  const society = runSocietyTick({
+    state: save.societySim!,
+    tickCount: save.tickCount ?? 0,
+    taxRateAvg: taxAvg,
+    prosperityAvg: prospAvg,
+    atWar: (save.wars ?? []).some(
+      (w) => w.attackerId === save.kingdom.id || w.defenderId === save.kingdom.id,
+    ),
+    siegeActive: (save.sieges ?? []).some(
+      (s) => s.attackerKingdomId === save.kingdom.id || s.defenderKingdomId === save.kingdom.id,
+    ),
+    pirateDisruption: (save.realmSim?.pirates ?? []).some((p) => p.active),
+    piety: save.realmSim?.faith.piety ?? 20,
+    tradeOpen: save.realmSim?.laws.active.includes('trade_open') ?? true,
+    provinceNames: ownedProv.map((p) => p.name),
+    cityNames: ownedProv.filter((p) => (p.city?.level ?? 0) > 0).map((p) => p.name),
+    provinces: ownedProv.map((p) => ({
+      id: p.id,
+      terrain: p.terrain,
+      name: p.name,
+      prosperity: p.prosperity ?? 50,
+    })),
+    goldAvailable: save.kingdom.gold,
+  });
+  save.societySim = society.state;
+  save.chronicle = [...(save.chronicle ?? []), ...society.chronicle];
+  save.kingdom.gold = Math.max(0, save.kingdom.gold + society.goldDelta);
+  save.kingdom.food = Math.max(0, save.kingdom.food + society.foodDelta);
+  save.kingdom.fame += society.fameDelta;
+  save.kingdom.influence += society.influenceDelta;
+  if (society.prestigeDelta && save.dynastySim) {
+    const ruler = save.dynastySim.characters.find((c) => c.isRuler);
+    if (ruler) ruler.prestige += society.prestigeDelta;
+    save.dynastySim.meta.prestige += society.prestigeDelta;
+  }
+  if (society.popLoss > 0 && ownedProv.length) {
+    const victim = ownedProv[Math.floor(Math.random() * ownedProv.length)];
+    victim.population = Math.max(50, victim.population - society.popLoss);
+  }
+  if (society.rulerHurt && save.dynastySim) {
+    const ruler = save.dynastySim.characters.find((c) => c.isRuler);
+    if (ruler) {
+      ruler.health = Math.max(5, (ruler.health ?? 100) - 25);
+      ruler.stress = Math.min(100, (ruler.stress ?? 0) + 20);
+    }
+  }
+  if (
+    society.newEvents.length === 0 &&
+    (save.pendingEvents?.length ?? 0) === 0
+  ) {
+    const qev = pickQuestEvent(save.societySim);
+    if (qev) save.pendingEvents = [qev];
+  }
+  if (society.alert) save.lastWorldAlert = society.alert;
 
   storeSave(userId, save);
   return toGameState(save);
@@ -1421,6 +1526,30 @@ export const localApi = {
       );
       save.pendingEvents = save.pendingEvents!.filter((e) => e.id !== data.eventId);
       ensureDynastySim(save);
+      return persist(userId, save);
+    }
+
+    // Dynamische Quests (Phase 5.2)
+    if (ev.templateId.startsWith('quest:')) {
+      ensureSocietySim(save);
+      const { state, result } = societyAcceptQuest(
+        save.societySim!,
+        ev.id,
+        data.choiceId,
+        save.tickCount ?? 0,
+      );
+      save.societySim = state;
+      save.kingdom.gold = Math.max(0, save.kingdom.gold + result.gold);
+      save.kingdom.food = Math.max(0, save.kingdom.food + result.food);
+      save.kingdom.fame += result.fame;
+      save.kingdom.influence += result.influence;
+      if (save.dynastySim && result.prestige) {
+        const ruler = save.dynastySim.characters.find((c) => c.isRuler);
+        if (ruler) ruler.prestige += result.prestige;
+        save.dynastySim.meta.prestige += result.prestige;
+      }
+      save.chronicle!.push(result.entry);
+      save.pendingEvents = save.pendingEvents!.filter((e) => e.id !== data.eventId);
       return persist(userId, save);
     }
 
@@ -2114,6 +2243,160 @@ export const localApi = {
       makeChronicle(save.tickCount ?? 0, 'battle', 'Piratenjagd', r.message),
     );
     if (r.victory) save.kingdom.fame += 3;
+    return persist(userId, save);
+  },
+
+  async startSocietySpy(data: { type: string; targetName: string }) {
+    const { userId, save } = requireSave();
+    ensureSocietySim(save);
+    const r = societyStartSpy(
+      save.societySim!,
+      data.type as
+        | 'intel'
+        | 'scout_city'
+        | 'watch_army'
+        | 'inspect_castle'
+        | 'steal_gold'
+        | 'burn_supplies'
+        | 'arson'
+        | 'bribe_general'
+        | 'influence_vassal'
+        | 'prepare_assassination',
+      data.targetName || 'Nachbarreich',
+      save.tickCount ?? 0,
+    );
+    if (r.error) throw new Error(r.error);
+    if (save.kingdom.gold < r.cost) throw new Error(`Nicht genug Gold (${r.cost})`);
+    save.kingdom.gold -= r.cost;
+    save.societySim = { ...save.societySim!, spies: r.agents, spyOps: r.ops };
+    return persist(userId, save);
+  },
+
+  async hireMercenary(data: { defId: string; provinceId: string }) {
+    const { userId, save } = requireSave();
+    ensureSocietySim(save);
+    const r = societyHireMerc(
+      save.societySim!,
+      data.defId as 'free_company' | 'crossbow_band' | 'heavy_riders' | 'sellsword_mob',
+      data.provinceId,
+    );
+    if (r.error || !r.company) throw new Error(r.error ?? 'Fehler');
+    if (save.kingdom.gold < r.cost) throw new Error(`Nicht genug Gold (${r.cost})`);
+    save.kingdom.gold -= r.cost;
+    save.societySim = {
+      ...save.societySim!,
+      mercenaries: [...save.societySim!.mercenaries, r.company],
+    };
+    return persist(userId, save);
+  },
+
+  async hireHero(data: { kind: string }) {
+    const { userId, save } = requireSave();
+    ensureSocietySim(save);
+    if (save.societySim!.heroes.some((h) => h.kind === data.kind)) {
+      throw new Error('Dieser Heldentyp ist bereits am Hof');
+    }
+    const r = societyHireHero(
+      save.societySim!,
+      data.kind as
+        | 'field_marshal'
+        | 'master_builder'
+        | 'great_merchant'
+        | 'famed_physician'
+        | 'master_smith'
+        | 'legend_knight',
+    );
+    if (r.error || !r.hero) throw new Error(r.error ?? 'Fehler');
+    if (save.kingdom.gold < r.cost) throw new Error(`Nicht genug Gold (${r.cost})`);
+    save.kingdom.gold -= r.cost;
+    save.societySim = {
+      ...save.societySim!,
+      heroes: [...save.societySim!.heroes, r.hero],
+    };
+    save.chronicle!.push(
+      makeChronicle(
+        save.tickCount ?? 0,
+        'hero',
+        r.hero.title,
+        `${r.hero.name} tritt in euren Dienst: ${r.hero.ability}`,
+      ),
+    );
+    return persist(userId, save);
+  },
+
+  async startRealmTournament(data: { discipline: string; participate: boolean }) {
+    const { userId, save } = requireSave();
+    ensureSocietySim(save);
+    if (save.societySim!.tournament?.active) throw new Error('Ein Turnier läuft bereits');
+    const costs: Record<string, number> = {
+      joust: 100,
+      archery: 80,
+      sword: 90,
+      riding: 85,
+    };
+    const cost = costs[data.discipline] ?? 100;
+    if (save.kingdom.gold < cost) throw new Error(`Nicht genug Gold (${cost})`);
+    save.kingdom.gold -= cost;
+    save.societySim = societyStartTournament(
+      save.societySim!,
+      data.discipline as 'joust' | 'archery' | 'sword' | 'riding',
+      data.participate,
+    );
+    return persist(userId, save);
+  },
+
+  async appeaseFaction(data: { factionId: string; gold: number }) {
+    const { userId, save } = requireSave();
+    ensureSocietySim(save);
+    const gold = Math.max(20, Math.min(100, data.gold || 40));
+    if (save.kingdom.gold < gold) throw new Error(`Nicht genug Gold (${gold})`);
+    save.kingdom.gold -= gold;
+    save.societySim = societyAppeaseFaction(
+      save.societySim!,
+      data.factionId as 'hochadel' | 'klerus' | 'haendler' | 'ritter' | 'bauern' | 'militaer',
+      gold,
+    );
+    return persist(userId, save);
+  },
+
+  async marketTrade(data: { good: string; amount: number; buy: boolean }) {
+    const { userId, save } = requireSave();
+    ensureSocietySim(save);
+    const r = societyTrade(
+      save.societySim!,
+      data.good as 'grain' | 'iron' | 'wood' | 'wine' | 'luxury' | 'weapons',
+      data.amount || 1,
+      data.buy,
+    );
+    if (r.error) throw new Error(r.error);
+    if (r.gold < 0 && save.kingdom.gold < -r.gold) throw new Error('Nicht genug Gold');
+    save.kingdom.gold = Math.max(0, save.kingdom.gold + r.gold);
+    if (data.good === 'grain' && data.buy) save.kingdom.food += data.amount * 5;
+    if (data.good === 'wood' && data.buy) save.kingdom.wood += data.amount;
+    if (data.good === 'iron' && data.buy) save.kingdom.iron += data.amount;
+    return persist(userId, save);
+  },
+
+  async fightBandits() {
+    const { userId, save } = requireSave();
+    ensureSocietySim(save);
+    const troops = save.armies
+      .filter((a) => a.kingdomId === save.kingdom.id)
+      .reduce((s, a) => s + a.units.reduce((u, x) => u + x.count, 0), 0);
+    const r = societyFightBandits(save.societySim!, Math.floor(troops / 3), save.tickCount ?? 0);
+    save.societySim = r.state;
+    save.kingdom.gold = Math.max(0, save.kingdom.gold + r.gold);
+    save.kingdom.fame += r.fame;
+    save.chronicle!.push(r.entry);
+    return persist(userId, save);
+  },
+
+  async increaseRulerGuard() {
+    const { userId, save } = requireSave();
+    ensureSocietySim(save);
+    if (save.kingdom.gold < 50) throw new Error('Nicht genug Gold (50)');
+    save.kingdom.gold -= 50;
+    save.societySim = societyIncreaseProtection(save.societySim!, 12);
     return persist(userId, save);
   },
 };

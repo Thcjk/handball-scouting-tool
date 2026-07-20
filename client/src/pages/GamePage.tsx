@@ -9,6 +9,7 @@ import CharacterPanel from '../components/CharacterPanel';
 import CityView from '../components/CityView';
 import IntroOverlay from '../components/IntroOverlay';
 import EventModal from '../components/EventModal';
+import AtmosphereAudio from '../components/AtmosphereAudio';
 import { buildIntroStory, INTRO_SEEN_KEY } from '../lore/intro';
 
 export default function GamePage() {
@@ -211,7 +212,10 @@ export default function GamePage() {
           selectedId={selectedProvince?.id ?? null}
           onSelect={handleSelect}
           mapMode={mapMode}
+          season={gameState.society?.climate.season}
+          weather={gameState.society?.climate.weather}
         />
+        <AtmosphereAudio mood={gameState.society?.atmosphere} enabled />
 
         {/* Charakter links (CK3-Stil) */}
         {showChar && gameState.dynasty && (
