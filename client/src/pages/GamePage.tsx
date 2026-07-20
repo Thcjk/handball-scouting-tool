@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api, type GameState, type Province, type BattleResult, isOfflineMode } from '../api/client';
-import { applyResourceTick } from '../local/localApi';
+import { applyResourceTick, getGameSpeedFromSession } from '../local/localApi';
+import { uiPollIntervalMs } from '@kronenchronik/shared';
 import { useGameSocket } from '../hooks/useGameSocket';
 import ResourceBar from '../components/ResourceBar';
 import WorldMap from '../components/WorldMap';
@@ -61,14 +62,31 @@ export default function GamePage() {
 
   useEffect(() => {
     if (!isOfflineMode) return;
-    const id = setInterval(() => {
-      const session = localStorage.getItem('kronenchronik_session');
-      if (!session) return;
-      const state = applyResourceTick(session);
-      if (state) setGameState(state);
-    }, 30000);
-    return () => clearInterval(id);
-  }, []);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const loop = () => {
+      if (cancelled) return;
+      const speed = getGameSpeedFromSession();
+      const ms = uiPollIntervalMs(speed);
+      timer = setTimeout(() => {
+        if (cancelled) return;
+        if (speed !== 'pause') {
+          const session = localStorage.getItem('kronenchronik_session');
+          if (session) {
+            const state = applyResourceTick(session);
+            if (state) setGameState(state);
+          }
+        }
+        loop();
+      }, ms);
+    };
+    loop();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [gameState?.endgame?.settings.speed]);
 
   useGameSocket({
     onGameStateUpdate: (state) => setGameState(state),
@@ -173,7 +191,22 @@ export default function GamePage() {
           ) : null}
         </div>
         <ResourceBar resources={gameState.kingdom.resources} />
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
+          {(['pause', 'normal', 'fast', 'very_fast'] as const).map((sp) => (
+            <button
+              key={sp}
+              type="button"
+              title="Spielgeschwindigkeit"
+              className={`btn-secondary text-[10px] py-1 ${
+                gameState.endgame?.settings.speed === sp ? 'border-gold text-gold' : ''
+              }`}
+              onClick={() => {
+                void api.setGameSpeed({ speed: sp }).then(handleUpdate);
+              }}
+            >
+              {sp === 'pause' ? '⏸' : sp === 'normal' ? '▶' : sp === 'fast' ? '⏩' : '⏭'}
+            </button>
+          ))}
           <button
             type="button"
             className={`btn-secondary text-[10px] py-1 ${mapMode === 'political' ? 'border-gold text-gold' : ''}`}

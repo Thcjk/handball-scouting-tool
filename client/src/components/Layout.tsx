@@ -20,7 +20,7 @@ export default function Layout() {
               </span>
             )}
           </div>
-          <nav className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <nav className="flex items-center gap-1 sm:gap-2 shrink-0 overflow-x-auto max-w-[70vw] sm:max-w-none pb-0.5">
             <NavLink
               to="/game"
               className={({ isActive }) =>
@@ -68,6 +68,14 @@ export default function Layout() {
               }
             >
               Welt
+            </NavLink>
+            <NavLink
+              to="/codex"
+              className={({ isActive }) =>
+                `px-2 py-1 text-xs sm:text-sm font-display transition-colors ${isActive ? 'text-gold' : 'text-parchment/70 hover:text-gold'}`
+              }
+            >
+              Codex
             </NavLink>
             <NavLink
               to="/profile"

@@ -118,6 +118,27 @@ import {
   societyUiCatalog,
   type SocietySimState,
 } from './societySim';
+import {
+  defaultEndgameSim,
+  endgameResistInvasion,
+  endgameUiCatalog,
+  migrateEndgameState,
+  runEndgameTick,
+  setGameSpeed,
+  type EndgameSimState,
+} from './endgameSim';
+import {
+  autoSave,
+  deleteNamedSlot,
+  listSaveSlots,
+  loadNamedSlot,
+  quickLoad,
+  quickSave,
+  readSaveBlob,
+  saveToNamedSlot,
+  writeSaveBlob,
+} from './saveManager';
+import { tickIntervalMs } from '@kronenchronik/shared';
 
 const USERS_KEY = 'kronenchronik_users';
 const SESSION_KEY = 'kronenchronik_session';
@@ -217,6 +238,8 @@ interface GameSave {
   worldExpanded?: boolean;
   /** Phase 5.2 – Gesellschaft & Atmosphäre */
   societySim?: SocietySimState;
+  /** Phase 5.3 – Endgame, Geschichte, Erfolge, Speed */
+  endgameSim?: EndgameSimState;
 }
 
 function saveKey(userId: string) {
@@ -286,9 +309,8 @@ function hasRoadOrIsRoad(
 }
 
 function loadSave(userId: string): GameSave | null {
-  const raw = localStorage.getItem(saveKey(userId));
-  if (!raw) return null;
-  const save = JSON.parse(raw) as GameSave;
+  const save = readSaveBlob<GameSave>(saveKey(userId));
+  if (!save) return null;
   ensureWorldFields(save);
   for (const p of save.provinces) {
     if (p.ownerId === save.kingdom.id) ensureProvinceDev(p);
@@ -326,6 +348,11 @@ function ensureWorldFields(save: GameSave) {
   expandWorldIfNeeded(save);
   ensureRealmSim(save);
   ensureSocietySim(save);
+  ensureEndgameSim(save);
+}
+
+function ensureEndgameSim(save: GameSave) {
+  save.endgameSim = migrateEndgameState(save.endgameSim);
 }
 
 function ensureSocietySim(save: GameSave) {
@@ -481,7 +508,12 @@ function fromSimWorld(save: GameSave, sim: SimWorld) {
 }
 
 function storeSave(userId: string, save: GameSave) {
-  localStorage.setItem(saveKey(userId), JSON.stringify(save));
+  writeSaveBlob(saveKey(userId), save);
+  try {
+    autoSave(userId, saveKey(userId), save);
+  } catch {
+    /* autosave best-effort */
+  }
 }
 
 function createWorld(): SaveProvince[] {
@@ -643,6 +675,7 @@ function createNewSave(kingdomName: string, rulerName: string): GameSave {
       provinces.filter((p) => p.terrain === Terrain.COAST || p.terrain === 'COAST').map((p) => p.id),
     ),
     societySim: defaultSocietySim(0),
+    endgameSim: defaultEndgameSim(),
   };
 }
 
@@ -834,6 +867,18 @@ function toGameState(save: GameSave): GameState {
           catalog: societyUiCatalog(),
         }
       : undefined,
+    endgame: save.endgameSim
+      ? {
+          crises: save.endgameSim.crises,
+          invasions: save.endgameSim.invasions,
+          history: save.endgameSim.history,
+          achievements: save.endgameSim.achievements,
+          settings: save.endgameSim.settings,
+          stats: save.endgameSim.stats,
+          peaceTicks: save.endgameSim.peaceTicks,
+          catalog: endgameUiCatalog(),
+        }
+      : undefined,
   };
 }
 
@@ -854,8 +899,13 @@ export function applyResourceTick(userId: string): GameState | null {
   const save = loadSave(userId);
   if (!save) return null;
 
+  ensureEndgameSim(save);
+  const speed = save.endgameSim!.settings.speed;
+  if (speed === 'pause') return toGameState(save);
+
   const now = Date.now();
-  if (now - save.lastTickAt < 25000) return toGameState(save);
+  const interval = tickIntervalMs(speed);
+  if (now - save.lastTickAt < interval) return toGameState(save);
 
   const kid = save.kingdom.id;
   if (!save.capitalProvinceId) {
@@ -1076,6 +1126,69 @@ export function applyResourceTick(userId: string): GameState | null {
     if (qev) save.pendingEvents = [qev];
   }
   if (society.alert) save.lastWorldAlert = society.alert;
+
+  // Phase 5.3: Endgame, Weltgeschichte, Erfolge
+  ensureEndgameSim(save);
+  const capital =
+    save.provinces.find((p) => p.id === save.capitalProvinceId) ??
+    save.provinces.find((p) => p.ownerId === save.kingdom.id);
+  const wars = save.wars ?? [];
+  const playerWars = wars.filter(
+    (w) => w.attackerId === save.kingdom.id || w.defenderId === save.kingdom.id,
+  );
+  const longestWar = playerWars.reduce(
+    (m, w) => Math.max(m, (save.tickCount ?? 0) - (w.startedTick ?? 0)),
+    0,
+  );
+  const endgame = runEndgameTick({
+    state: save.endgameSim!,
+    tickCount: save.tickCount ?? 0,
+    year: 1042 + Math.floor((save.tickCount ?? 0) / 12),
+    provinceCount: ownedProv.length,
+    coastalNames: save.provinces
+      .filter((p) => p.terrain === Terrain.COAST || p.terrain === 'COAST')
+      .map((p) => p.name),
+    gold: save.kingdom.gold,
+    food: save.kingdom.food,
+    fame: save.kingdom.fame,
+    population: ownedProv.reduce((s, p) => s + p.population, 0),
+    capitalPop: capital?.population ?? 0,
+    capitalName: capital?.name ?? 'Hauptstadt',
+    capitalCityLevel: capital?.city?.level ?? 0,
+    rulerName: save.dynasty.ruler?.name ?? save.kingdom.name,
+    dynastyName: save.dynastySim?.meta.name ?? save.kingdom.name,
+    dynastyPrestige: save.dynastySim?.meta.prestige ?? 0,
+    titleRank: save.dynastySim?.title.rank,
+    hasCastle: ownedProv.some((p) => (p.castle?.level ?? 0) > 0),
+    warCount: playerWars.length,
+    longestWarTicks: longestWar,
+    armyCount: save.armies.filter((a) => a.kingdomId === save.kingdom.id).length,
+    techCount: save.realmSim?.tech.researched.length ?? 0,
+    piety: save.realmSim?.faith.piety ?? 0,
+    tradeRoutes: save.realmSim?.seaRoutes.length ?? 0,
+    heroes: save.societySim?.heroes.length ?? 0,
+    wondersCompleted: save.realmSim?.wonders.filter((w) => w.completed).length ?? 0,
+    hasCathedral: save.realmSim?.wonders.some((w) => w.wonderId === 'great_cathedral' && w.completed) ?? false,
+    fleetCount: save.realmSim?.fleets.length ?? 0,
+    famineSeverity: save.societySim?.disasters.some((d) => d.kind === 'drought' || d.kind === 'harsh_winter')
+      ? 5
+      : save.endgameSim?.crises.some((c) => c.kind === 'famine')
+        ? 8
+        : undefined,
+    plagueSeverity: save.societySim?.diseases[0]?.severity,
+    rebellionStrength: save.realmSim?.civilWar?.active
+      ? save.realmSim.civilWar.factions.reduce((s, f) => s + f.strength, 0)
+      : undefined,
+    generalFame: save.generals?.[0]?.fame,
+    generalName: save.generals?.[0]?.name,
+    tournamentWonThisTick: save.societySim?.tournament?.winner === 'Ihr Herrscher',
+  });
+  save.endgameSim = endgame.state;
+  save.chronicle = [...(save.chronicle ?? []), ...endgame.chronicle];
+  save.kingdom.gold = Math.max(0, save.kingdom.gold + endgame.goldDelta);
+  save.kingdom.food = Math.max(0, save.kingdom.food + endgame.foodDelta);
+  save.kingdom.fame += endgame.fameDelta;
+  if (endgame.alert) save.lastWorldAlert = endgame.alert;
 
   storeSave(userId, save);
   return toGameState(save);
@@ -2399,7 +2512,92 @@ export const localApi = {
     save.societySim = societyIncreaseProtection(save.societySim!, 12);
     return persist(userId, save);
   },
+
+  async setGameSpeed(data: { speed: string }) {
+    const { userId, save } = requireSave();
+    ensureEndgameSim(save);
+    save.endgameSim = setGameSpeed(
+      save.endgameSim!,
+      data.speed as 'pause' | 'normal' | 'fast' | 'very_fast',
+    );
+    return persist(userId, save);
+  },
+
+  async resistInvasion() {
+    const { userId, save } = requireSave();
+    ensureEndgameSim(save);
+    const troops = save.armies
+      .filter((a) => a.kingdomId === save.kingdom.id)
+      .reduce((s, a) => s + a.units.reduce((u, x) => u + x.count, 0), 0);
+    const r = endgameResistInvasion(save.endgameSim!, Math.floor(troops / 2), save.tickCount ?? 0);
+    if (save.kingdom.gold < r.goldCost) throw new Error(`Nicht genug Gold (${r.goldCost})`);
+    save.kingdom.gold -= r.goldCost;
+    save.endgameSim = r.state;
+    save.kingdom.fame += r.fame;
+    save.chronicle!.push(r.entry);
+    return persist(userId, save);
+  },
+
+  async listSaveSlots() {
+    const userId = getSessionUserId();
+    if (!userId) throw new Error('Nicht eingeloggt');
+    return { slots: listSaveSlots(userId) };
+  },
+
+  async saveToSlot(data: { name: string }) {
+    const { userId, save } = requireSave();
+    const meta = saveToNamedSlot(userId, data.name, save, {
+      kingdomName: save.kingdom.name,
+      tickCount: save.tickCount ?? 0,
+      year: 1042 + Math.floor((save.tickCount ?? 0) / 12),
+    });
+    return { slot: meta, gameState: toGameState(save) };
+  },
+
+  async loadFromSlot(data: { slotId: string }) {
+    const userId = getSessionUserId();
+    if (!userId) throw new Error('Nicht eingeloggt');
+    const loaded = loadNamedSlot<GameSave>(userId, data.slotId);
+    if (!loaded) throw new Error('Spielstand nicht gefunden');
+    ensureWorldFields(loaded);
+    storeSave(userId, loaded);
+    return toGameState(loaded);
+  },
+
+  async deleteSaveSlot(data: { slotId: string }) {
+    const userId = getSessionUserId();
+    if (!userId) throw new Error('Nicht eingeloggt');
+    deleteNamedSlot(userId, data.slotId);
+    return { slots: listSaveSlots(userId) };
+  },
+
+  async quickSaveGame() {
+    const { userId, save } = requireSave();
+    quickSave(userId, saveKey(userId), save);
+    return toGameState(save);
+  },
+
+  async quickLoadGame() {
+    const userId = getSessionUserId();
+    if (!userId) throw new Error('Nicht eingeloggt');
+    const loaded = quickLoad<GameSave>(userId, saveKey(userId));
+    if (!loaded) throw new Error('Kein Schnellspeicher gefunden');
+    ensureWorldFields(loaded);
+    storeSave(userId, loaded);
+    return toGameState(loaded);
+  },
 };
+
+export function getGameSpeedFromSession(): 'pause' | 'normal' | 'fast' | 'very_fast' {
+  try {
+    const userId = getSessionUserId();
+    if (!userId) return 'normal';
+    const save = readSaveBlob<GameSave>(saveKey(userId));
+    return save?.endgameSim?.settings.speed ?? 'normal';
+  } catch {
+    return 'normal';
+  }
+}
 
 export function localLogout() {
   localStorage.removeItem(SESSION_KEY);

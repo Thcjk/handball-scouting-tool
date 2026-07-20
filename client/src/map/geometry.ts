@@ -88,12 +88,13 @@ export const LAKE_ELLIPSES = [
   { cx: 300, cy: 420, rx: 32, ry: 16 },
 ];
 
-export type ZoomLod = 'far' | 'mid' | 'near';
+export type ZoomLod = 'far' | 'mid' | 'near' | 'ultra';
 
 export function zoomLod(scale: number): ZoomLod {
-  if (scale < 0.65) return 'far';
-  if (scale < 1.35) return 'mid';
-  return 'near';
+  if (scale < 0.55) return 'far';
+  if (scale < 1.15) return 'mid';
+  if (scale < 2.1) return 'near';
+  return 'ultra';
 }
 
 /** Burg-Stufe → Darstellung */

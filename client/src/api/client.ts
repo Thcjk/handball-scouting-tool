@@ -174,6 +174,24 @@ const remoteApi = {
   fightBandits: () => request<GameState>('/game/society/bandits', { method: 'POST', body: '{}' }),
   increaseRulerGuard: () =>
     request<GameState>('/game/society/guard', { method: 'POST', body: '{}' }),
+  setGameSpeed: (data: { speed: string }) =>
+    request<GameState>('/game/endgame/speed', { method: 'POST', body: JSON.stringify(data) }),
+  resistInvasion: () => request<GameState>('/game/endgame/resist', { method: 'POST', body: '{}' }),
+  listSaveSlots: () => request<{ slots: Array<{ id: string; name: string; updatedAt: number }> }>('/game/saves'),
+  saveToSlot: (data: { name: string }) =>
+    request<{ slot: { id: string; name: string }; gameState: GameState }>('/game/saves', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  loadFromSlot: (data: { slotId: string }) =>
+    request<GameState>('/game/saves/load', { method: 'POST', body: JSON.stringify(data) }),
+  deleteSaveSlot: (data: { slotId: string }) =>
+    request<{ slots: Array<{ id: string; name: string }> }>('/game/saves/delete', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  quickSaveGame: () => request<GameState>('/game/saves/quick', { method: 'POST', body: '{}' }),
+  quickLoadGame: () => request<GameState>('/game/saves/quick-load', { method: 'POST', body: '{}' }),
 };
 
 import { localApi } from '../local/localApi';
@@ -709,6 +727,53 @@ export interface GameState {
       marketGoods: Record<string, string>;
       nobleRanks: Record<string, string>;
       wildlife: Record<string, string>;
+    };
+  };
+  endgame?: {
+    crises: Array<{
+      id: string;
+      kind: string;
+      title: string;
+      description: string;
+      severity: number;
+      ticksLeft: number;
+      active: boolean;
+    }>;
+    invasions: Array<{
+      id: string;
+      kind: string;
+      name: string;
+      strength: number;
+      coastalTargets: string[];
+      ticksLeft: number;
+      active: boolean;
+    }>;
+    history: {
+      records: Array<{ id: string; label: string; value: number; detail: string; year: number }>;
+      milestones: Array<{ tick: number; year: number; text: string }>;
+    };
+    achievements: Array<{ id: string; unlocked: boolean; unlockedTick?: number }>;
+    settings: { speed: string; showTooltips: boolean; tutorialHints: boolean };
+    stats: {
+      population: number;
+      gold: number;
+      food: number;
+      provinces: number;
+      armies: number;
+      wars: number;
+      fame: number;
+      tech: number;
+      piety: number;
+      tradeRoutes: number;
+      heroes: number;
+      tick: number;
+      history: Array<{ tick: number; gold: number; population: number; provinces: number }>;
+    };
+    peaceTicks: number;
+    catalog: {
+      achievements: Array<{ id: string; name: string; description: string }>;
+      speeds: Record<string, string>;
+      historyLabels: Record<string, string>;
     };
   };
 }

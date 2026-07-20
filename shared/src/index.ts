@@ -39,3 +39,7 @@ export * from './mercenaries';
 export * from './worldEconomy';
 export * from './climate';
 export * from './banditsWildlife';
+export * from './endgame';
+export * from './worldHistory';
+export * from './achievements';
+export * from './gameSettings';

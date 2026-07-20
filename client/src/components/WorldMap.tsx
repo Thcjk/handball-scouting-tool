@@ -83,6 +83,8 @@ export default function WorldMap({
   const maxY = Math.max(...provinces.map((p) => p.y), 0);
   const { width, height } = mapBounds(maxX, maxY);
   const lod = zoomLod(transform.scale);
+  const detail = lod === 'near' || lod === 'ultra';
+  const ultra = lod === 'ultra';
 
   const ownerIds = useMemo(
     () => [...new Set(provinces.map((p) => p.ownerId).filter(Boolean))] as string[],
@@ -120,7 +122,7 @@ export default function WorldMap({
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     setTransform((t) => ({
       ...t,
-      scale: Math.min(3.2, Math.max(0.35, t.scale * delta)),
+      scale: Math.min(4.2, Math.max(0.35, t.scale * delta)),
     }));
   };
 
@@ -155,15 +157,16 @@ export default function WorldMap({
         }}
       />
       <div className="absolute top-2 left-2 z-20 panel px-2 py-1 text-[10px] text-parchment/70 pointer-events-none">
-        {lod === 'far' && 'Reichsübersicht'}
-        {lod === 'mid' && 'Provinzen & Straßen'}
+        {lod === 'far' && 'Kontinente & Reiche'}
+        {lod === 'mid' && 'Provinzen, Städte & Flüsse'}
         {lod === 'near' && 'Nahsicht – Felder & Leben'}
+        {lod === 'ultra' && 'Maximal – Häuser, Bürger, Details'}
         {season ? ` · ${season}` : ''}
         {weather ? ` · ${weather}` : ''}
       </div>
 
       <div className="absolute top-2 right-2 z-20 flex gap-1">
-        <button type="button" className="map-ctrl" onClick={() => setTransform((t) => ({ ...t, scale: Math.min(3.2, t.scale * 1.2) }))}>+</button>
+        <button type="button" className="map-ctrl" onClick={() => setTransform((t) => ({ ...t, scale: Math.min(4.2, t.scale * 1.2) }))}>+</button>
         <button type="button" className="map-ctrl" onClick={() => setTransform((t) => ({ ...t, scale: Math.max(0.35, t.scale * 0.8) }))}>−</button>
         <button type="button" className="map-ctrl" onClick={() => setTransform({ x: 24, y: 16, scale: 0.9 })}>⌂</button>
       </div>
@@ -240,15 +243,15 @@ export default function WorldMap({
                   x2={r.x2}
                   y2={r.y2}
                   stroke="url(#roadGrad)"
-                  strokeWidth={lod === 'near' ? 3.5 : 2.2}
+                  strokeWidth={detail ? (ultra ? 4.2 : 3.5) : 2.2}
                   strokeLinecap="round"
-                  strokeDasharray={lod === 'near' ? undefined : '6 4'}
+                  strokeDasharray={detail ? undefined : '6 4'}
                   opacity={0.85}
                 />
               ))}
 
             {/* Brücken-Marken an Fluss-Kreuzungen (dekorativ) */}
-            {lod === 'near' &&
+            {detail &&
               [
                 [160, 210],
                 [350, 220],
@@ -311,12 +314,41 @@ export default function WorldMap({
                   )}
 
                   {/* Nah: Dekor */}
-                  {lod === 'near' &&
+                  {detail &&
                     nearDecor(p.name, p.x, p.y, p.terrain).map((d, i) => (
-                      <text key={i} x={d.px} y={d.py} fontSize={9} opacity={0.75} pointerEvents="none">
+                      <text
+                        key={i}
+                        x={d.px}
+                        y={d.py}
+                        fontSize={ultra ? 11 : 9}
+                        opacity={0.75}
+                        pointerEvents="none"
+                        className={ultra ? 'map-sway' : undefined}
+                      >
                         {d.glyph}
                       </text>
                     ))}
+
+                  {/* Ultra: Gärten, Brunnen, Marktstände, Baustellen */}
+                  {ultra && cityLv > 0 && (
+                    <g pointerEvents="none" opacity={0.85}>
+                      <text x={cx - 22} y={cy + 18} fontSize={10} className="ambient-wander">
+                        🏡
+                      </text>
+                      <text x={cx + 20} y={cy + 16} fontSize={9} className="ambient-wander" style={{ animationDelay: '1s' }}>
+                        ⛲
+                      </text>
+                      <text x={cx - 8} y={cy + 26} fontSize={9}>
+                        🧺
+                      </text>
+                      <text x={cx + 10} y={cy - 32} fontSize={9} className="map-smoke">
+                        🔥
+                      </text>
+                      <text x={cx - 28} y={cy - 6} fontSize={8} className="ambient-flag">
+                        🏳️
+                      </text>
+                    </g>
+                  )}
 
                   {/* Siedlung / Burg */}
                   {lod !== 'far' && castle && (
@@ -343,14 +375,14 @@ export default function WorldMap({
                   )}
 
                   {/* Rauch bei Städten */}
-                  {lod === 'near' && cityLv > 0 && (
+                  {detail && cityLv > 0 && (
                     <text x={cx + 8} y={cy - 28} fontSize={10} className="map-smoke" opacity={0.7}>
                       💨
                     </text>
                   )}
 
                   {/* Name */}
-                  {(lod !== 'near' || isSelected || p.isOwned) && (
+                  {(lod === 'far' || lod === 'mid' || isSelected || p.isOwned || ultra) && (
                     <text
                       x={cx}
                       y={cy + (lod === 'far' ? 4 : 14)}
@@ -403,7 +435,7 @@ export default function WorldMap({
                     animationDelay: `${a.delay}s`,
                     animationDuration: `${a.duration}s`,
                   }}
-                  opacity={lod === 'near' ? 0.9 : 0.65}
+                  opacity={detail ? (ultra ? 1 : 0.9) : 0.65}
                   pointerEvents="none"
                 >
                   {AMBIENT_GLYPH[a.kind]}

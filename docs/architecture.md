@@ -3,53 +3,93 @@
 ## Übersicht
 
 ```
+┌─────────────────┐
+│  Client (React) │  Offline-First (GitHub Pages)
+│  localApi + Sims│  Fortschritt in localStorage
+└────────┬────────┘
+         │ nutzt
+┌────────▼────────┐
+│  Shared Logic   │  Wirtschaft, KI, Dynastie, Reich, Gesellschaft, Endgame
+└─────────────────┘
+
+Optional (Online-Stack, nicht nötig zum Spielen):
 ┌─────────────┐  REST + WebSocket  ┌─────────────┐     Prisma     ┌────────────┐
 │   Client    │ ◄────────────────► │   Server    │ ◄────────────► │ PostgreSQL │
-│  (React)    │     JWT Auth       │  (NestJS)   │                │            │
-└─────────────┘                    └──────┬──────┘                └────────────┘
-                                          │
-                                   ┌──────▼──────┐
-                                   │   Shared    │
-                                   │ Spiellogik  │
-                                   └─────────────┘
+└─────────────┘                    └─────────────┘                └────────────┘
 ```
 
-## Server-Module
+## Offline-Module (client/src/local)
 
 | Modul | Aufgabe |
 |-------|---------|
-| `auth/` | JWT, Registrierung mit Königreich + Dynastie + Erbe |
-| `users/` | Profilverwaltung |
-| `game/` | Spielzustand, Bau, Rekrutierung, Schlachten, Städte |
-| `dynasty/` | Thronfolge, Charakterverwaltung |
-| `diplomacy/` | Krieg, Frieden, Bündnisse, Handel |
-| `tick/` | Ressourcen-Ticks für aktive Spieler (30s Cron) |
-| `game/game.gateway` | WebSocket-Events |
+| `localApi.ts` | Dünne API: Persistenz, Tick-Orchestrierung, Spieleraktionen |
+| `worldSim.ts` | KI-Reiche, Kriege, Belagerungen, Welt-Ereignisse |
+| `dynastySim.ts` | Familie, Hof, Titel, Immersion |
+| `realmSim.ts` | Vasallen, Gesetze, Tech, Wunder, Flotten, Religion |
+| `societySim.ts` | Adel, Fraktionen, Spione, Quests, Markt, Klima |
+| `endgameSim.ts` | Krisen, Invasionen, Weltgeschichte, Erfolge, Stats |
+| `saveManager.ts` | Multi-Slots, Autosave, Quicksave, Backup |
 
-## WebSocket-Events
+Shared-Pakete liefern reine Logik ohne DOM/Storage – austauschbar für Server/Multiplayer.
 
-- `gameStateUpdate` – nach jeder Spielaktion
-- `resourceTick` – alle 30s für aktive Spieler
-- `battleResult` – nach Schlachten
-- `succession` – bei Herrscher-Tod
-- `diplomacyEvent` – Kriegserklärungen etc.
+## Tick-Reihenfolge
 
-## Dynastie-System
+1. Spielerwirtschaft (Produktion, Steuern, Handel)
+2. `simulateWorldTick` (KI)
+3. `runDynastyTick`
+4. `runRealmTick`
+5. `runSocietyTick`
+6. `runEndgameTick`
+7. Persistenz (+ Autosave)
 
-- Jeder Spieler startet mit Herrscher + Erbe
-- Herrscher altern (alle 10 Ticks) und können ab Alter 70 sterben
-- 5% Todeschance in verlorenen Schlachten
-- Erbe übernimmt automatisch das Reich
+Geschwindigkeit steuert Tick-Abstand (`pause` / `normal` / `fast` / `very_fast`).
 
-## Diplomatie
+## Modularität
 
-- Angriffe nur bei Kriegserklärung (neutrale Provinzen ausgenommen)
-- Allianzen schützen vor Angriffen
-- Handelsabkommen für Bonus-Einkommen (geplant)
+Systeme **nutzen** einander über klaren State, hängen aber nicht zyklisch:
 
-## Ressourcen-Ticks
+- Wirtschaft ↔ Handel ↔ Klima (Modifikatoren)
+- Diplomatie / KI ↔ Kriege ↔ Invasionen
+- Dynastie ↔ Erfolge / Weltgeschichte
+- Städte / Karte = Darstellung, keine Spiellogik-Besitzer
 
-Nur Spieler mit `lastSeen` < 2 Min erhalten Ticks:
-- Basiseinkommen + Gebäude-Boni pro Provinz
-- Truppenunterhalt wird abgezogen
-- Stadt-Level gibt Gold- und Einfluss-Bonus
+Neue Inhalte: neues Shared-Modul + optional `*Sim.ts` + dünne `localApi`-Hooks + UI-Seite.
+
+## Fehlerbehandlung & Saves
+
+- `saveManager.readSaveBlob` fällt auf Backup zurück
+- Tick/API fangen ungültige Zustände mit Defaults (`ensure*` / `migrate*`)
+- Fehler in der UI als verständliche Meldungen
+
+## Performance-Hinweise
+
+- Karten-LOD (far→ultra): Details nur bei Zoom
+- Ambient-Akteure begrenzt (~36)
+- Chronik gekappt; Statistik-History max. 60 Punkte
+- Lazy: Stadtansicht nur bei geöffneter Provinz
+
+## Zukunftssicher
+
+Vorbereitet / erweiterbar:
+
+| Thema | Ansatz |
+|-------|--------|
+| Multiplayer / Dedicated Server | Shared-Logik bereits getrennt; `localApi` ↔ Server-Adapter |
+| Cloud-Saves | `saveManager` API abstrahieren (gleiche Slot-Metadaten) |
+| Mods / DLC | Daten-Tabellen in Shared (Tech, Quests, Achievements) |
+| Steam / Desktop | Vite-Build + Offline-Modus |
+| Lokalisierung | UI-Strings zentralisieren (Hilfe bereits in `helpContent.ts`) |
+
+## Server-Module (optional Online)
+
+| Modul | Aufgabe |
+|-------|---------|
+| `auth/` | JWT, Registrierung |
+| `game/` | Spielzustand |
+| `dynasty/` | Thronfolge |
+| `diplomacy/` | Krieg, Frieden |
+| `tick/` | Ressourcen-Ticks |
+
+## Ressourcen-Ticks (Online)
+
+Nur Spieler mit `lastSeen` < 2 Min erhalten Ticks (Server-Cron).
