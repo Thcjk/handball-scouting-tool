@@ -83,7 +83,7 @@ const remoteApi = {
     request<GameState>('/game/province/tax', { method: 'POST', body: JSON.stringify(data) }),
   setCapital: (data: { provinceId: string }) =>
     request<GameState>('/game/capital', { method: 'POST', body: JSON.stringify(data) }),
-  attack: (data: { armyId: string; targetProvinceId: string }) =>
+  attack: (data: { armyId: string; targetProvinceId: string; storm?: boolean }) =>
     request<{ battle: Battle; result: BattleResult; gameState: GameState }>('/game/attack', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -119,6 +119,16 @@ const remoteApi = {
       method: 'POST',
       body: JSON.stringify({ targetKingdomId }),
     }),
+  resolveWorldEvent: (data: { eventId: string; choiceId: string }) =>
+    request<GameState>('/game/event/resolve', { method: 'POST', body: JSON.stringify(data) }),
+  abandonSiege: (data: { siegeId: string }) =>
+    request<GameState>('/game/siege/abandon', { method: 'POST', body: JSON.stringify(data) }),
+  sendSpy: (data: { targetKingdomId: string; mission: 'intel' | 'sabotage' | 'steal' | 'revolt' }) =>
+    request<GameState>('/game/spy', { method: 'POST', body: JSON.stringify(data) }),
+  assignGeneral: (data: { armyId: string; generalId: string | null }) =>
+    request<GameState>('/game/general/assign', { method: 'POST', body: JSON.stringify(data) }),
+  getChronicle: () =>
+    request<{ entries: GameState['chronicle']; year: number; tickCount: number }>('/game/chronicle'),
 };
 
 import { localApi } from '../local/localApi';
@@ -197,11 +207,32 @@ export interface DiplomacyState {
     id: string;
     status: string;
     partner: { id: string; name: string };
-    partnerId: string;
+    partnerId?: string;
+    opinion?: number;
+    label?: string;
+    lastReason?: string;
   }>;
-  kingdoms: Array<{ id: string; name: string; fame: number; user: { username: string } }>;
+  kingdoms: Array<{
+    id: string;
+    name: string;
+    fame?: number;
+    user?: { username: string };
+    personality?: string;
+    religion?: string;
+    culture?: string;
+    provinceCount?: number;
+    rulerName?: string;
+  }>;
   myAlliance: { id: string; name: string; members: Array<{ id: string; name: string }> } | null;
   availableAlliances: Array<{ id: string; name: string; memberCount: number }>;
+  wars?: Array<{
+    id: string;
+    attackerId: string;
+    defenderId: string;
+    reasonText: string;
+    attackerName?: string;
+    defenderName?: string;
+  }>;
 }
 
 export interface Province {
@@ -285,6 +316,8 @@ export interface Army {
   targetProvinceId?: string | null;
   marchArrivesAt?: string | null;
   provinceId?: string;
+  generalId?: string;
+  kingdomId?: string;
   units: Array<{ id: string; type: string; count: number }>;
   province?: { id: string; name: string };
 }
@@ -313,6 +346,74 @@ export interface GameState {
   provinces: Province[];
   armies: Army[];
   recentBattles: Battle[];
+  tickCount?: number;
+  worldYear?: number;
+  aiKingdoms?: Array<{
+    id: string;
+    name: string;
+    personality: string;
+    personalityLabel: string;
+    culture: string;
+    religion: string;
+    gold: number;
+    provinceCount: number;
+    rulerName: string;
+    rulerAge: number;
+  }>;
+  wars?: Array<{
+    id: string;
+    attackerId: string;
+    defenderId: string;
+    reasonText: string;
+    reasonId?: string;
+  }>;
+  sieges?: Array<{
+    id: string;
+    provinceId: string;
+    progress: number;
+    morale: number;
+    foodLeft: number;
+    wallIntegrity: number;
+    provinceName?: string;
+    attackerKingdomId: string;
+  }>;
+  chronicle?: Array<{
+    id: string;
+    tick: number;
+    year: number;
+    category: string;
+    title: string;
+    text: string;
+    at: number;
+  }>;
+  pendingEvents?: Array<{
+    id: string;
+    templateId: string;
+    title: string;
+    description: string;
+    choices: Array<{ id: string; label: string }>;
+    provinceId?: string;
+  }>;
+  generals?: Array<{
+    id: string;
+    name: string;
+    age: number;
+    martial: number;
+    personality: string;
+    experience: number;
+    fame: number;
+    armyId?: string;
+  }>;
+  goals?: Array<{
+    id: string;
+    title: string;
+    description: string;
+    progress: number;
+    target: number;
+    completed: boolean;
+  }>;
+  playerSpies?: number;
+  worldAlert?: string;
 }
 
 export { ApiError };

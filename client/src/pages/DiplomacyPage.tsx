@@ -12,7 +12,8 @@ export default function DiplomacyPage() {
   const [state, setState] = useState<DiplomacyState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [allianceName, setAllianceName] = useState('');
+  const [spyTarget, setSpyTarget] = useState('');
+  const [msg, setMsg] = useState('');
 
   useEffect(() => {
     load();
@@ -31,10 +32,14 @@ export default function DiplomacyPage() {
 
   const handleAction = async (action: () => Promise<unknown>) => {
     setError('');
+    setMsg('');
     try {
       const result = await action();
       if (result && typeof result === 'object' && 'diplomacy' in result) {
         setState((result as { diplomacy: DiplomacyState }).diplomacy);
+      } else if (result && typeof result === 'object' && 'kingdom' in result) {
+        setMsg('Aktion ausgeführt');
+        await load();
       } else {
         setState(result as DiplomacyState);
       }
@@ -47,167 +52,157 @@ export default function DiplomacyPage() {
     return <div className="text-center text-medieval-gold animate-pulse py-20">Laden...</div>;
   if (!state) return <div className="text-center text-red-400">{error}</div>;
 
-  if (isOfflineMode) {
-    return (
-      <div className="space-y-6 max-w-3xl mx-auto">
-        <h2 className="text-2xl font-bold text-medieval-gold">Diplomatie</h2>
-        <div className="card border border-medieval-gold/40">
-          <p className="text-medieval-gold font-semibold mb-2">Einzelspieler-Modus</p>
-          <p className="text-gray-300 text-sm">
-            Diplomatie mit anderen Spielern ist im Browser-Spiel ohne Server nicht verfügbar.
-            Erobere Provinzen auf der Weltkarte und erweitere dein Königreich.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <h2 className="text-2xl font-bold text-medieval-gold">Diplomatie</h2>
+      <p className="text-sm text-parchment/60">
+        {isOfflineMode
+          ? 'Lebendige KI-Reiche mit Persönlichkeiten, Kriegen und Verträgen.'
+          : 'Beziehungen zu anderen Herrschern.'}
+      </p>
 
       {error && (
         <div className="bg-medieval-red/20 border border-medieval-red text-red-300 px-3 py-2 rounded text-sm">
           {error}
         </div>
       )}
+      {msg && <div className="text-green-300 text-sm">{msg}</div>}
 
-      {state.myAlliance && (
-        <div className="card">
-          <h3 className="font-bold text-medieval-gold mb-2">
-            Mein Bündnis: {state.myAlliance.name}
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {state.myAlliance.members.map((m) => (
-              <span key={m.id} className="text-sm bg-medieval-dark px-2 py-1 rounded">
-                {m.name}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="card space-y-3">
-        <h3 className="font-bold text-medieval-gold">Beziehungen</h3>
-        {state.relations.length === 0 && (
-          <p className="text-gray-400 text-sm">Noch keine diplomatischen Beziehungen.</p>
-        )}
-        {state.relations.map((r) => (
-          <div
-            key={r.id}
-            className="flex items-center justify-between bg-medieval-dark p-3 rounded"
-          >
-            <div>
-              <span className="font-semibold">{r.partner.name}</span>
-              <span className={`ml-2 text-sm ${STATUS_LABELS[r.status]?.color ?? ''}`}>
-                {STATUS_LABELS[r.status]?.label ?? r.status}
-              </span>
-            </div>
-            <div className="flex gap-2">
-              {r.status === 'AT_WAR' && (
+      {state.wars && state.wars.length > 0 && (
+        <div className="card border border-red-700/40">
+          <h3 className="font-bold text-red-300 mb-2">Aktive Kriege</h3>
+          {state.wars.map((w) => (
+            <div key={w.id} className="text-sm text-parchment/80 mb-2">
+              {w.reasonText}
+              <div className="mt-1">
                 <button
-                  onClick={() => handleAction(() => api.makePeace(r.partnerId))}
+                  type="button"
                   className="btn-secondary text-xs"
+                  onClick={() =>
+                    handleAction(() =>
+                      api.makePeace(
+                        w.attackerName === undefined
+                          ? w.defenderId
+                          : /* find other */ (() => {
+                              // peace with the AI side
+                              const ids = [w.attackerId, w.defenderId];
+                              return ids.find((id) => state.kingdoms.some((k) => k.id === id))!;
+                            })(),
+                      ),
+                    )
+                  }
                 >
-                  Frieden
+                  Frieden anbieten
                 </button>
-              )}
-              {r.status === 'NEUTRAL' && (
-                <>
-                  <button
-                    onClick={() => handleAction(() => api.declareWar(r.partnerId))}
-                    className="btn-danger text-xs"
-                  >
-                    Krieg
-                  </button>
-                  <button
-                    onClick={() => handleAction(() => api.proposeTrade(r.partnerId))}
-                    className="btn-secondary text-xs"
-                  >
-                    Handel
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="card space-y-3">
-        <h3 className="font-bold text-medieval-gold">Andere Königreiche</h3>
-        {state.kingdoms.map((k) => {
-          const relation = state.relations.find((r) => r.partnerId === k.id);
-          return (
-            <div
-              key={k.id}
-              className="flex items-center justify-between bg-medieval-dark p-3 rounded text-sm"
-            >
-              <div>
-                <span className="font-semibold">{k.name}</span>
-                <span className="text-gray-400 ml-2">({k.user.username})</span>
-                <span className="text-medieval-light ml-2">⭐ {k.fame}</span>
               </div>
-              {!relation && (
-                <button
-                  onClick={() => handleAction(() => api.declareWar(k.id))}
-                  className="btn-danger text-xs"
-                >
-                  Krieg erklären
-                </button>
-              )}
-            </div>
-          );
-        })}
-        {state.kingdoms.length === 0 && (
-          <p className="text-gray-400 text-sm">Keine anderen Spieler online.</p>
-        )}
-      </div>
-
-      {!state.myAlliance && (
-        <div className="card space-y-3">
-          <h3 className="font-bold text-medieval-gold">Bündnis gründen</h3>
-          <div className="flex gap-2">
-            <input
-              value={allianceName}
-              onChange={(e) => setAllianceName(e.target.value)}
-              className="input-field flex-1"
-              placeholder="Name des Bündnisses"
-            />
-            <button
-              onClick={() => {
-                const target = state.kingdoms[0];
-                if (target && allianceName) {
-                  handleAction(() => api.proposeAlliance(target.id, allianceName));
-                }
-              }}
-              className="btn-primary text-sm"
-              disabled={!allianceName || state.kingdoms.length === 0}
-            >
-              Gründen
-            </button>
-          </div>
-        </div>
-      )}
-
-      {state.availableAlliances.length > 0 && !state.myAlliance && (
-        <div className="card space-y-3">
-          <h3 className="font-bold text-medieval-gold">Bündnissen beitreten</h3>
-          {state.availableAlliances.map((a) => (
-            <div
-              key={a.id}
-              className="flex items-center justify-between bg-medieval-dark p-3 rounded text-sm"
-            >
-              <span>
-                {a.name} ({a.memberCount} Mitglieder)
-              </span>
-              <button
-                onClick={() => handleAction(() => api.joinAlliance(a.id))}
-                className="btn-primary text-xs"
-              >
-                Beitreten
-              </button>
             </div>
           ))}
+        </div>
+      )}
+
+      <div className="card">
+        <h3 className="font-bold text-medieval-gold mb-3">Reiche & Beziehungen</h3>
+        {state.relations.length === 0 && (
+          <p className="text-sm text-parchment/50">Noch keine anderen Reiche bekannt.</p>
+        )}
+        <div className="space-y-3">
+          {state.relations.map((r) => {
+            const st = STATUS_LABELS[r.status] ?? STATUS_LABELS.NEUTRAL;
+            const k = state.kingdoms.find((x) => x.id === r.partner.id);
+            return (
+              <div key={r.id} className="border border-gold/15 rounded p-3 bg-black/30">
+                <div className="flex flex-wrap justify-between gap-2">
+                  <div>
+                    <div className="font-display text-gold">{r.partner.name}</div>
+                    <div className="text-[11px] text-parchment/60">
+                      {k?.personality && `${k.personality} · `}
+                      {k?.rulerName && `${k.rulerName} · `}
+                      {k?.provinceCount ?? '?'} Provinzen
+                    </div>
+                    <div className={`text-xs ${st.color}`}>
+                      {r.label ?? st.label}
+                      {typeof r.opinion === 'number' ? ` (${r.opinion > 0 ? '+' : ''}${Math.round(r.opinion)})` : ''}
+                    </div>
+                    {r.lastReason && (
+                      <div className="text-[10px] text-parchment/40 mt-0.5">{r.lastReason}</div>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {r.status !== 'AT_WAR' && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn-secondary text-[10px]"
+                          onClick={() => handleAction(() => api.proposeTrade(r.partner.id))}
+                        >
+                          Handel
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary text-[10px]"
+                          onClick={() =>
+                            handleAction(() => api.proposeAlliance(r.partner.id, 'Bündnis'))
+                          }
+                        >
+                          Bündnis
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary text-[10px] text-red-300"
+                          onClick={() => handleAction(() => api.declareWar(r.partner.id))}
+                        >
+                          Krieg
+                        </button>
+                      </>
+                    )}
+                    {r.status === 'AT_WAR' && (
+                      <button
+                        type="button"
+                        className="btn-secondary text-[10px]"
+                        onClick={() => handleAction(() => api.makePeace(r.partner.id))}
+                      >
+                        Frieden
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {isOfflineMode && (
+        <div className="card">
+          <h3 className="font-bold text-medieval-gold mb-2">Spionage</h3>
+          <p className="text-xs text-parchment/60 mb-2">Kosten: 40 Gold. Missionen: Informationen, Diebstahl, Sabotage, Unruhen.</p>
+          <div className="flex flex-wrap gap-2 items-center">
+            <select
+              className="bg-black/40 border border-gold/30 rounded text-sm px-2 py-1"
+              value={spyTarget}
+              onChange={(e) => setSpyTarget(e.target.value)}
+            >
+              <option value="">Zielreich…</option>
+              {state.kingdoms.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.name}
+                </option>
+              ))}
+            </select>
+            {(['intel', 'steal', 'sabotage', 'revolt'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                disabled={!spyTarget}
+                className="btn-secondary text-[10px]"
+                onClick={() =>
+                  handleAction(() => api.sendSpy({ targetKingdomId: spyTarget, mission: m }))
+                }
+              >
+                {m === 'intel' ? 'Aufklären' : m === 'steal' ? 'Stehlen' : m === 'sabotage' ? 'Sabotieren' : 'Unruhen'}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

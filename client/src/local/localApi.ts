@@ -31,8 +31,28 @@ import {
   countProfessions,
   upgradeCostMultiplier,
   hasAdjacentRoad,
+  areAtWar,
+  ensureRelation,
+  adjustOpinion,
+  makeChronicle,
+  createSiege,
+  stormAttackerBonus,
+  resolveEventChoice,
+  relationLabel,
+  personalityLabel,
+  WAR_REASONS,
   type CityTile,
   type ProvinceDevStats,
+  type AiKingdomState,
+  type KingdomRelation,
+  type ActiveWar,
+  type ActiveSiege,
+  type ChronicleEntry,
+  type PendingWorldEvent,
+  type WorldGeneral,
+  type SpyMission,
+  type LongTermGoal,
+  type WarReasonId,
 } from '@kronenchronik/shared';
 import type {
   User,
@@ -43,6 +63,12 @@ import type {
   Battle,
 } from '../api/client';
 import { mottoFromName } from '../lore/intro';
+import {
+  defaultWorldExtras,
+  simulateWorldTick,
+  spawnAiKingdoms,
+  type SimWorld,
+} from './worldSim';
 
 const USERS_KEY = 'kronenchronik_users';
 const SESSION_KEY = 'kronenchronik_session';
@@ -73,6 +99,8 @@ interface SaveArmy {
   provinceId: string;
   morale: number;
   isGarrison: boolean;
+  kingdomId?: string;
+  generalId?: string;
   units: SaveUnit[];
 }
 
@@ -120,6 +148,19 @@ interface GameSave {
   battles: Battle[];
   dynasty: DynastyInfo;
   lastTickAt: number;
+  /** Phase 3 – lebendige Welt */
+  tickCount?: number;
+  aiKingdoms?: AiKingdomState[];
+  relations?: KingdomRelation[];
+  wars?: ActiveWar[];
+  sieges?: ActiveSiege[];
+  chronicle?: ChronicleEntry[];
+  pendingEvents?: PendingWorldEvent[];
+  generals?: WorldGeneral[];
+  spyMissions?: SpyMission[];
+  goals?: LongTermGoal[];
+  playerSpies?: number;
+  lastWorldAlert?: string;
 }
 
 function saveKey(userId: string) {
@@ -192,10 +233,98 @@ function loadSave(userId: string): GameSave | null {
   const raw = localStorage.getItem(saveKey(userId));
   if (!raw) return null;
   const save = JSON.parse(raw) as GameSave;
+  ensureWorldFields(save);
   for (const p of save.provinces) {
     if (p.ownerId === save.kingdom.id) ensureProvinceDev(p);
   }
+  // Migration: KI-Reiche nachträglich spawnen
+  const sim = toSimWorld(save);
+  if (sim.aiKingdoms.length === 0) {
+    spawnAiKingdoms(sim);
+    fromSimWorld(save, sim);
+    storeSave(userId, save);
+  }
   return save;
+}
+
+function ensureWorldFields(save: GameSave) {
+  const extras = defaultWorldExtras();
+  if (!save.aiKingdoms) save.aiKingdoms = extras.aiKingdoms;
+  if (!save.relations) save.relations = extras.relations;
+  if (!save.wars) save.wars = extras.wars;
+  if (!save.sieges) save.sieges = extras.sieges;
+  if (!save.chronicle) save.chronicle = extras.chronicle;
+  if (!save.pendingEvents) save.pendingEvents = extras.pendingEvents;
+  if (!save.generals) save.generals = extras.generals;
+  if (!save.spyMissions) save.spyMissions = extras.spyMissions;
+  if (!save.goals) save.goals = extras.goals;
+  if (save.playerSpies === undefined) save.playerSpies = 1;
+  if (save.tickCount === undefined) save.tickCount = 0;
+  for (const a of save.armies) {
+    if (!a.kingdomId) {
+      const owner = save.provinces.find((p) => p.id === a.provinceId)?.ownerId;
+      a.kingdomId = owner ?? save.kingdom.id;
+    }
+  }
+}
+
+function toSimWorld(save: GameSave): SimWorld {
+  ensureWorldFields(save);
+  return {
+    playerKingdomId: save.kingdom.id,
+    playerName: save.kingdom.name,
+    tickCount: save.tickCount ?? 0,
+    provinces: save.provinces,
+    armies: save.armies,
+    aiKingdoms: save.aiKingdoms!,
+    relations: save.relations!,
+    wars: save.wars!,
+    sieges: save.sieges!,
+    chronicle: save.chronicle!,
+    pendingEvents: save.pendingEvents!,
+    generals: save.generals!,
+    spyMissions: save.spyMissions!,
+    goals: save.goals!,
+    playerSpies: save.playerSpies ?? 1,
+    playerResources: {
+      gold: save.kingdom.gold,
+      food: save.kingdom.food,
+      wood: save.kingdom.wood,
+      stone: save.kingdom.stone,
+      iron: save.kingdom.iron,
+      influence: save.kingdom.influence,
+      fame: save.kingdom.fame,
+    },
+    playerDynasty: {
+      characters: save.dynasty.characters,
+      ruler: save.dynasty.ruler,
+      heir: save.dynasty.heir,
+    },
+  };
+}
+
+function fromSimWorld(save: GameSave, sim: SimWorld) {
+  save.tickCount = sim.tickCount;
+  save.aiKingdoms = sim.aiKingdoms;
+  save.relations = sim.relations;
+  save.wars = sim.wars;
+  save.sieges = sim.sieges;
+  save.chronicle = sim.chronicle;
+  save.pendingEvents = sim.pendingEvents;
+  save.generals = sim.generals;
+  save.spyMissions = sim.spyMissions;
+  save.goals = sim.goals;
+  save.playerSpies = sim.playerSpies;
+  save.kingdom.gold = sim.playerResources.gold;
+  save.kingdom.food = sim.playerResources.food;
+  save.kingdom.wood = sim.playerResources.wood;
+  save.kingdom.stone = sim.playerResources.stone;
+  save.kingdom.iron = sim.playerResources.iron;
+  save.kingdom.influence = sim.playerResources.influence;
+  save.kingdom.fame = sim.playerResources.fame;
+  save.dynasty.characters = sim.playerDynasty.characters;
+  save.dynasty.ruler = sim.playerDynasty.ruler;
+  save.dynasty.heir = sim.playerDynasty.heir;
 }
 
 function storeSave(userId: string, save: GameSave) {
@@ -259,6 +388,7 @@ function createNewSave(kingdomName: string, rulerName: string): GameSave {
       provinceId: startProvince.id,
       morale: 100,
       isGarrison: true,
+      kingdomId: kingdomId,
       units: [
         { id: uid(), type: 'MILITIA', count: 10 },
         { id: uid(), type: 'SPEARMAN', count: 5 },
@@ -276,7 +406,7 @@ function createNewSave(kingdomName: string, rulerName: string): GameSave {
     provinces,
     armies,
     battles: [],
-      dynasty: {
+    dynasty: {
       dynasty: { id: dynastyId, name: `Haus ${rulerName}`, motto: mottoFromName(rulerName) },
       characters: [
         {
@@ -350,7 +480,24 @@ function createNewSave(kingdomName: string, rulerName: string): GameSave {
       },
     },
     lastTickAt: Date.now(),
+    ...defaultWorldExtras(),
   };
+}
+
+function finalizeNewSave(save: GameSave): GameSave {
+  ensureWorldFields(save);
+  const sim = toSimWorld(save);
+  spawnAiKingdoms(sim);
+  fromSimWorld(save, sim);
+  save.chronicle!.unshift(
+    makeChronicle(
+      0,
+      'coronation',
+      'Die Chronik beginnt',
+      `${save.dynasty.ruler?.name ?? 'Ein Herrscher'} begründet ${save.kingdom.name}. Das Jahr ${1042} bricht an.`,
+    ),
+  );
+  return save;
 }
 
 function toGameState(save: GameSave): GameState {
@@ -435,11 +582,38 @@ function toGameState(save: GameSave): GameState {
         morale: a.morale,
         isGarrison: a.isGarrison,
         provinceId: a.provinceId,
+        generalId: a.generalId,
+        kingdomId: a.kingdomId,
         units: a.units,
         province: prov ? { id: prov.id, name: prov.name } : undefined,
       };
     }),
     recentBattles: save.battles.slice(0, 10),
+    tickCount: save.tickCount ?? 0,
+    worldYear: 1042 + Math.floor((save.tickCount ?? 0) / 12),
+    aiKingdoms: (save.aiKingdoms ?? []).map((k) => ({
+      id: k.id,
+      name: k.name,
+      personality: k.personality,
+      personalityLabel: personalityLabel(k.personality),
+      culture: k.culture,
+      religion: k.religion,
+      gold: k.gold,
+      provinceCount: save.provinces.filter((p) => p.ownerId === k.id).length,
+      rulerName: k.ruler.name,
+      rulerAge: k.ruler.age,
+    })),
+    wars: save.wars ?? [],
+    sieges: (save.sieges ?? []).map((s) => ({
+      ...s,
+      provinceName: save.provinces.find((p) => p.id === s.provinceId)?.name,
+    })),
+    chronicle: (save.chronicle ?? []).slice(-80).reverse(),
+    pendingEvents: save.pendingEvents ?? [],
+    generals: (save.generals ?? []).filter((g) => g.kingdomId === kid && g.alive),
+    goals: save.goals ?? [],
+    playerSpies: save.playerSpies ?? 1,
+    worldAlert: save.lastWorldAlert,
   };
 }
 
@@ -551,6 +725,15 @@ export function applyResourceTick(userId: string): GameState | null {
   save.kingdom.influence += totalIncome.influence;
   save.lastTickAt = now;
 
+  // Phase 3: lebendige Welt (KI, Belagerungen, Ereignisse, Chronik)
+  ensureWorldFields(save);
+  const sim = toSimWorld(save);
+  const alerts = simulateWorldTick(sim);
+  fromSimWorld(save, sim);
+  if (alerts.warAlert) save.lastWorldAlert = alerts.warAlert;
+  else if (alerts.successionMsg) save.lastWorldAlert = alerts.successionMsg;
+  else save.lastWorldAlert = undefined;
+
   storeSave(userId, save);
   return toGameState(save);
 }
@@ -576,7 +759,7 @@ export const localApi = {
     };
     users.push(user);
     setUsers(users);
-    const save = createNewSave(data.kingdomName, data.rulerName);
+    const save = finalizeNewSave(createNewSave(data.kingdomName, data.rulerName));
     storeSave(user.id, save);
     localStorage.setItem(SESSION_KEY, user.id);
     return {
@@ -745,6 +928,7 @@ export const localApi = {
       provinceId: data.provinceId,
       morale: 100,
       isGarrison: false,
+      kingdomId: save.kingdom.id,
       units: garrison.units.map((u) => ({
         id: uid(),
         type: u.type,
@@ -809,33 +993,94 @@ export const localApi = {
     return persist(userId, save);
   },
 
-  async attack(data: { armyId: string; targetProvinceId: string }) {
+  async attack(data: { armyId: string; targetProvinceId: string; storm?: boolean }) {
     const { userId, save } = requireSave();
+    ensureWorldFields(save);
     const army = save.armies.find((a) => a.id === data.armyId);
     if (!army || army.isGarrison) throw new Error('Armee nicht gefunden');
+    army.kingdomId = save.kingdom.id;
     const target = save.provinces.find((p) => p.id === data.targetProvinceId)!;
     const source = save.provinces.find((p) => p.id === army.provinceId)!;
 
-    if (!source.neighborSlugs.includes(target.slug)) throw new Error('Muss Nachbar sein');
+    if (!source.neighborSlugs.includes(target.slug) && army.provinceId !== target.id) {
+      throw new Error('Muss Nachbar sein');
+    }
     if (target.ownerId === save.kingdom.id) throw new Error('Eigene Provinz');
 
-    const defenderUnits = save.armies
-      .filter((a) => a.provinceId === target.id)
-      .flatMap((a) => a.units.map((u) => ({ type: u.type as UnitType, count: u.count })));
-    if (defenderUnits.length === 0) {
-      defenderUnits.push({ type: UnitType.MILITIA, count: 5 });
+    // Kriegspflicht gegen KI-Reiche
+    if (target.ownerId) {
+      const isAi = save.aiKingdoms!.some((k) => k.id === target.ownerId);
+      if (isAi && !areAtWar(save.wars!, save.kingdom.id, target.ownerId)) {
+        throw new Error('Erst Krieg erklären (Diplomatie)');
+      }
     }
 
+    // Belagerung statt Sofortangriff bei Burg
+    const castleLevel = target.castle?.level ?? 0;
+    const existingSiege = save.sieges!.find((s) => s.provinceId === target.id);
+    if (castleLevel >= 1 && !data.storm && !existingSiege) {
+      army.provinceId = target.id;
+      const siege = createSiege({
+        id: uid(),
+        provinceId: target.id,
+        attackerKingdomId: save.kingdom.id,
+        defenderKingdomId: target.ownerId ?? 'neutral',
+        armyId: army.id,
+        castleLevel,
+        tick: save.tickCount ?? 0,
+      });
+      save.sieges!.push(siege);
+      save.chronicle!.push(
+        makeChronicle(
+          save.tickCount ?? 0,
+          'siege',
+          `Belagerung von ${target.name}`,
+          `Dein Heer schließt ${target.name} ein. Nahrung und Moral der Besatzung sinken mit der Zeit.`,
+        ),
+      );
+      return {
+        battle: {
+          id: uid(),
+          attackerWon: false,
+          createdAt: new Date().toISOString(),
+          province: { name: target.name },
+          attacker: { name: save.kingdom.name },
+          defender: { name: target.ownerName ?? 'Garnison' },
+        },
+        result: {
+          attackerWon: false,
+          summary: `Belagerung von ${target.name} begonnen (Fortschritt 0%). Stürmen oder warten.`,
+          rounds: [],
+          attackerCasualties: [],
+          defenderCasualties: [],
+        },
+        gameState: persist(userId, save),
+      };
+    }
+
+    const siege = existingSiege ?? save.sieges!.find((s) => s.provinceId === target.id);
+    const stormBonus = siege ? stormAttackerBonus(siege) : 0;
+
+    const defenderArmies = save.armies.filter((a) => a.provinceId === target.id && a.id !== army.id);
+    let defenderUnits = defenderArmies.flatMap((a) =>
+      a.units.map((u) => ({ type: u.type as UnitType, count: u.count })),
+    );
+    if (defenderUnits.length === 0) {
+      defenderUnits = [{ type: UnitType.MILITIA, count: 5 + castleLevel * 3 }];
+    }
+
+    const aiDef = save.aiKingdoms!.find((k) => k.id === target.ownerId);
     const ruler = save.dynasty.ruler;
+    const general = save.generals?.find((g) => g.id === army.generalId && g.alive);
     const result = resolveBattle({
       attackerUnits: army.units.map((u) => ({ type: u.type as UnitType, count: u.count })),
       defenderUnits,
       terrain: target.terrain as Terrain,
-      attackerMorale: army.morale,
-      defenderMorale: 80,
-      castleLevel: target.castle?.level ?? 0,
-      attackerCommanderMartial: ruler?.martial ?? 5,
-      defenderCommanderMartial: 5,
+      attackerMorale: army.morale + stormBonus * 2,
+      defenderMorale: siege ? Math.max(20, siege.morale) : 80,
+      castleLevel: data.storm || siege ? Math.max(0, castleLevel - Math.floor(stormBonus / 3)) : castleLevel,
+      attackerCommanderMartial: (general?.martial ?? ruler?.martial ?? 5) + stormBonus,
+      defenderCommanderMartial: aiDef?.ruler.martial ?? 5,
     });
 
     for (const c of result.attackerCasualties) {
@@ -843,12 +1088,24 @@ export const localApi = {
       if (u) u.count = Math.max(0, u.count - c.count);
     }
     army.units = army.units.filter((u) => u.count > 0);
+
+    for (const d of defenderArmies) {
+      for (const c of result.defenderCasualties) {
+        const u = d.units.find((x) => x.type === c.type);
+        if (u) u.count = Math.max(0, u.count - Math.ceil(c.count / Math.max(1, defenderArmies.length)));
+      }
+      d.units = d.units.filter((u) => u.count > 0);
+    }
+    save.armies = save.armies.filter((a) => a.units.reduce((s, u) => s + u.count, 0) > 0 || a.isGarrison);
+
     if (army.units.length === 0) {
       save.armies = save.armies.filter((a) => a.id !== army.id);
+      if (siege) save.sieges = save.sieges!.filter((s) => s.id !== siege.id);
     }
 
     if (result.attackerWon) {
-      const wasEnemy = target.ownerId && target.ownerId !== save.kingdom.id;
+      const oldOwner = target.ownerId;
+      const wasEnemy = Boolean(oldOwner);
       target.ownerId = save.kingdom.id;
       target.ownerName = save.kingdom.name;
       army.provinceId = target.id;
@@ -857,6 +1114,16 @@ export const localApi = {
       if (!target.city) target.city = { level: 0 };
       ensureProvinceDev(target);
       save.kingdom.fame += wasEnemy ? 10 : 5;
+      if (siege) save.sieges = save.sieges!.filter((s) => s.provinceId !== target.id);
+      if (oldOwner) adjustOpinion(save.relations!, oldOwner, save.kingdom.id, -25, 'defeat');
+      save.chronicle!.push(
+        makeChronicle(
+          save.tickCount ?? 0,
+          'battle',
+          `${target.name} erobert`,
+          result.summary,
+        ),
+      );
     }
 
     const battle: Battle = {
@@ -865,11 +1132,161 @@ export const localApi = {
       createdAt: new Date().toISOString(),
       province: { name: target.name },
       attacker: { name: save.kingdom.name },
-      defender: target.ownerName ? { name: target.ownerName } : null,
+      defender: { name: target.ownerName ?? 'Garnison' },
     };
     save.battles.unshift(battle);
 
     return { battle, result, gameState: persist(userId, save) };
+  },
+
+  async abandonSiege(data: { siegeId: string }) {
+    const { userId, save } = requireSave();
+    ensureWorldFields(save);
+    save.sieges = save.sieges!.filter((s) => s.id !== data.siegeId);
+    return persist(userId, save);
+  },
+
+  async resolveWorldEvent(data: { eventId: string; choiceId: string }) {
+    const { userId, save } = requireSave();
+    ensureWorldFields(save);
+    const ev = save.pendingEvents!.find((e) => e.id === data.eventId);
+    if (!ev) throw new Error('Ereignis nicht gefunden');
+    const effect = resolveEventChoice(ev.templateId, data.choiceId);
+    if (!effect) throw new Error('Ungültige Wahl');
+
+    save.kingdom.gold = Math.max(0, save.kingdom.gold + (effect.gold ?? 0));
+    save.kingdom.food = Math.max(0, save.kingdom.food + (effect.food ?? 0));
+    save.kingdom.wood = Math.max(0, save.kingdom.wood + (effect.wood ?? 0));
+    save.kingdom.stone = Math.max(0, save.kingdom.stone + (effect.stone ?? 0));
+    save.kingdom.iron = Math.max(0, save.kingdom.iron + (effect.iron ?? 0));
+    save.kingdom.influence += effect.influence ?? 0;
+    save.kingdom.fame += effect.fame ?? 0;
+
+    if (ev.provinceId) {
+      const p = save.provinces.find((x) => x.id === ev.provinceId);
+      if (p) {
+        if (effect.populationDelta) p.population = Math.max(50, p.population + effect.populationDelta);
+        if (effect.prosperityDelta) p.prosperity = Math.max(0, Math.min(100, p.prosperity + effect.prosperityDelta));
+        if (effect.satisfactionDelta && p.devStats) {
+          p.devStats.satisfaction = Math.max(
+            0,
+            Math.min(100, p.devStats.satisfaction + effect.satisfactionDelta),
+          );
+        }
+      }
+    }
+
+    if (effect.chronicleTitle) {
+      save.chronicle!.push(
+        makeChronicle(
+          save.tickCount ?? 0,
+          'event',
+          effect.chronicleTitle,
+          effect.chronicleText ?? ev.title,
+        ),
+      );
+    } else {
+      save.chronicle!.push(
+        makeChronicle(save.tickCount ?? 0, 'event', ev.title, `Entscheidung: ${data.choiceId}`),
+      );
+    }
+
+    // Held als General
+    if (ev.templateId === 'hero_appears' && data.choiceId === 'hire_general') {
+      save.generals!.push({
+        id: uid(),
+        kingdomId: save.kingdom.id,
+        name: 'Legendenfeldherr',
+        age: 38,
+        martial: 14,
+        personality: 'legendär',
+        experience: 40,
+        traits: ['mutig', 'charismatisch'],
+        alive: true,
+        fame: 20,
+      });
+    }
+
+    save.pendingEvents = save.pendingEvents!.filter((e) => e.id !== data.eventId);
+    return persist(userId, save);
+  },
+
+  async sendSpy(data: { targetKingdomId: string; mission: 'intel' | 'sabotage' | 'steal' | 'revolt' }) {
+    const { userId, save } = requireSave();
+    ensureWorldFields(save);
+    if ((save.playerSpies ?? 0) < 1) throw new Error('Keine Spione verfügbar');
+    if (save.kingdom.gold < 40) throw new Error('Nicht genug Gold (40)');
+    save.kingdom.gold -= 40;
+    save.playerSpies = (save.playerSpies ?? 1) - 1;
+    const target = save.aiKingdoms!.find((k) => k.id === data.targetKingdomId);
+    if (!target) throw new Error('Zielreich nicht gefunden');
+
+    const success = Math.random() < 0.55 + (save.dynasty.ruler?.intrigue ?? 5) * 0.03;
+    const discovered = !success && Math.random() < 0.4;
+    let text = '';
+    if (success) {
+      save.playerSpies = (save.playerSpies ?? 0) + 1;
+      if (data.mission === 'intel') {
+        text = `${target.name}: ${personalityLabel(target.personality)}, Gold ~${target.gold}, ${save.provinces.filter((p) => p.ownerId === target.id).length} Provinzen.`;
+        save.kingdom.influence += 3;
+      } else if (data.mission === 'steal') {
+        const steal = Math.min(80, Math.floor(target.gold * 0.15));
+        target.gold -= steal;
+        save.kingdom.gold += steal;
+        text = `Spion stahl ${steal} Gold aus ${target.name}.`;
+      } else if (data.mission === 'sabotage') {
+        const p = save.provinces.find((x) => x.ownerId === target.id);
+        if (p) {
+          p.prosperity = Math.max(0, p.prosperity - 8);
+          p.defense = Math.max(5, p.defense - 5);
+        }
+        text = `Sabotage in ${target.name} – Verteidigung und Wohlstand geschwächt.`;
+        adjustOpinion(save.relations!, save.kingdom.id, target.id, -10, 'Spionage');
+      } else {
+        const p = save.provinces.find((x) => x.ownerId === target.id);
+        if (p) p.population = Math.max(50, p.population - 100);
+        text = `Unruhen in ${target.name} geschürt.`;
+        adjustOpinion(save.relations!, save.kingdom.id, target.id, -15, 'Spionage');
+      }
+    } else {
+      save.playerSpies = (save.playerSpies ?? 0) + 1;
+      text = discovered
+        ? `Spion in ${target.name} enttarnt! Beziehungen verschlechtern sich.`
+        : `Mission in ${target.name} gescheitert.`;
+      if (discovered) adjustOpinion(save.relations!, save.kingdom.id, target.id, -20, 'Spion enttarnt');
+    }
+    save.chronicle!.push(makeChronicle(save.tickCount ?? 0, 'spy', 'Spionage', text));
+    save.lastWorldAlert = text;
+    return persist(userId, save);
+  },
+
+  async assignGeneral(data: { armyId: string; generalId: string | null }) {
+    const { userId, save } = requireSave();
+    ensureWorldFields(save);
+    const army = save.armies.find((a) => a.id === data.armyId);
+    if (!army || army.isGarrison) throw new Error('Feldarmee nicht gefunden');
+    if (data.generalId) {
+      const g = save.generals!.find((x) => x.id === data.generalId && x.alive);
+      if (!g || g.kingdomId !== save.kingdom.id) throw new Error('General nicht gefunden');
+      for (const a of save.armies) {
+        if (a.generalId === data.generalId) a.generalId = undefined;
+      }
+      army.generalId = data.generalId;
+      g.armyId = army.id;
+    } else {
+      army.generalId = undefined;
+    }
+    return persist(userId, save);
+  },
+
+  async getChronicle() {
+    const save = loadSave(getSessionUserId()!)!;
+    ensureWorldFields(save);
+    return {
+      entries: [...(save.chronicle ?? [])].reverse(),
+      year: 1042 + Math.floor((save.tickCount ?? 0) / 12),
+      tickCount: save.tickCount ?? 0,
+    };
   },
 
   async upgradeVillage(data: { provinceId: string }) {
@@ -1010,14 +1427,134 @@ export const localApi = {
   },
 
   async getDiplomacy(): Promise<DiplomacyState> {
-    return { relations: [], kingdoms: [], myAlliance: null, availableAlliances: [] };
+    const save = loadSave(getSessionUserId()!)!;
+    ensureWorldFields(save);
+    const kid = save.kingdom.id;
+    const kingdoms = save.aiKingdoms!.map((k) => ({
+      id: k.id,
+      name: k.name,
+      personality: personalityLabel(k.personality),
+      religion: k.religion,
+      culture: k.culture,
+      provinceCount: save.provinces.filter((p) => p.ownerId === k.id).length,
+      rulerName: k.ruler.name,
+    }));
+    const relations = save.aiKingdoms!.map((k) => {
+      const rel = ensureRelation(save.relations!, kid, k.id);
+      const atWar = areAtWar(save.wars!, kid, k.id);
+      return {
+        id: `${kid}_${k.id}`,
+        status: atWar ? 'AT_WAR' : rel.status,
+        opinion: rel.opinion,
+        label: relationLabel(rel.opinion, atWar),
+        lastReason: rel.lastReason,
+        partner: { id: k.id, name: k.name },
+      };
+    });
+    return {
+      relations,
+      kingdoms,
+      myAlliance: null,
+      availableAlliances: [],
+      wars: save.wars!.map((w) => ({
+        ...w,
+        attackerName:
+          w.attackerId === kid
+            ? save.kingdom.name
+            : save.aiKingdoms!.find((a) => a.id === w.attackerId)?.name ?? '?',
+        defenderName:
+          w.defenderId === kid
+            ? save.kingdom.name
+            : save.aiKingdoms!.find((a) => a.id === w.defenderId)?.name ?? '?',
+      })),
+    };
   },
 
-  declareWar: async () => localApi.getDiplomacy(),
-  makePeace: async () => localApi.getDiplomacy(),
-  proposeAlliance: async () => ({ diplomacy: await localApi.getDiplomacy() }),
-  joinAlliance: async () => localApi.getDiplomacy(),
-  proposeTrade: async () => localApi.getDiplomacy(),
+  async declareWar(targetKingdomId: string) {
+    const { userId, save } = requireSave();
+    ensureWorldFields(save);
+    if (areAtWar(save.wars!, save.kingdom.id, targetKingdomId)) throw new Error('Bereits im Krieg');
+    if (save.kingdom.influence < 10) throw new Error('Nicht genug Einfluss (10)');
+    save.kingdom.influence -= 10;
+    const target = save.aiKingdoms!.find((k) => k.id === targetKingdomId);
+    if (!target) throw new Error('Reich nicht gefunden');
+    const reasonId: WarReasonId = 'ambition';
+    const text = `${save.kingdom.name} erklärt ${target.name} den Krieg wegen: ${WAR_REASONS[reasonId]}`;
+    save.wars!.push({
+      id: uid(),
+      attackerId: save.kingdom.id,
+      defenderId: targetKingdomId,
+      reasonId,
+      reasonText: text,
+      startedTick: save.tickCount ?? 0,
+      startedAt: Date.now(),
+    });
+    const rel = ensureRelation(save.relations!, save.kingdom.id, targetKingdomId);
+    rel.status = 'AT_WAR';
+    rel.opinion = Math.min(rel.opinion, -50);
+    save.chronicle!.push(makeChronicle(save.tickCount ?? 0, 'war', 'Kriegserklärung', text));
+    storeSave(userId, save);
+    return localApi.getDiplomacy();
+  },
+
+  async makePeace(targetKingdomId: string) {
+    const { userId, save } = requireSave();
+    ensureWorldFields(save);
+    save.wars = save.wars!.filter(
+      (w) =>
+        !(
+          (w.attackerId === save.kingdom.id && w.defenderId === targetKingdomId) ||
+          (w.defenderId === save.kingdom.id && w.attackerId === targetKingdomId)
+        ),
+    );
+    const rel = ensureRelation(save.relations!, save.kingdom.id, targetKingdomId);
+    rel.status = 'NEUTRAL';
+    rel.opinion = Math.min(0, rel.opinion + 20);
+    adjustOpinion(save.relations!, save.kingdom.id, targetKingdomId, 10, 'Frieden');
+    const name = save.aiKingdoms!.find((k) => k.id === targetKingdomId)?.name ?? 'Gegner';
+    save.chronicle!.push(
+      makeChronicle(save.tickCount ?? 0, 'peace', 'Frieden', `Frieden mit ${name} geschlossen.`),
+    );
+    // Belagerungen gegen dieses Reich beenden
+    save.sieges = save.sieges!.filter(
+      (s) => s.attackerKingdomId !== targetKingdomId && s.defenderKingdomId !== targetKingdomId,
+    );
+    storeSave(userId, save);
+    return localApi.getDiplomacy();
+  },
+
+  async proposeAlliance(targetKingdomId: string, allianceName: string) {
+    const { userId, save } = requireSave();
+    ensureWorldFields(save);
+    const rel = ensureRelation(save.relations!, save.kingdom.id, targetKingdomId);
+    if (rel.status === 'AT_WAR') throw new Error('Im Krieg kein Bündnis');
+    if (rel.opinion < 20) throw new Error('Beziehungen zu schlecht (mind. +20)');
+    if (save.kingdom.influence < 15) throw new Error('Nicht genug Einfluss (15)');
+    save.kingdom.influence -= 15;
+    rel.status = 'ALLIED';
+    adjustOpinion(save.relations!, save.kingdom.id, targetKingdomId, 20, allianceName || 'Bündnis');
+    storeSave(userId, save);
+    return { diplomacy: await localApi.getDiplomacy() };
+  },
+
+  async joinAlliance(allianceId: string) {
+    void allianceId;
+    return localApi.getDiplomacy();
+  },
+
+  async proposeTrade(targetKingdomId: string) {
+    const { userId, save } = requireSave();
+    ensureWorldFields(save);
+    const rel = ensureRelation(save.relations!, save.kingdom.id, targetKingdomId);
+    if (rel.status === 'AT_WAR') throw new Error('Im Krieg kein Handel');
+    if (save.kingdom.influence < 5) throw new Error('Nicht genug Einfluss (5)');
+    save.kingdom.influence -= 5;
+    rel.status = 'TRADE_PACT';
+    adjustOpinion(save.relations!, save.kingdom.id, targetKingdomId, 8, 'Handelsvertrag');
+    save.kingdom.gold += 15;
+    storeSave(userId, save);
+    return localApi.getDiplomacy();
+  },
 };
 
 export function localLogout() {

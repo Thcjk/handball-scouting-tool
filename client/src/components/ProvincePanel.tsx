@@ -340,9 +340,51 @@ export default function ProvincePanel({
       {!isOwned && isNeighbor && attackableArmies.length > 0 && (
         <div className="space-y-2 border-t border-medieval-brown/30 pt-3">
           <h3 className="font-semibold text-medieval-red">Militär</h3>
+          {(() => {
+            const siege = gameState.sieges?.find((s) => s.provinceId === province.id);
+            if (!siege) return null;
+            return (
+              <div className="text-xs bg-black/40 border border-amber-700/40 rounded p-2 space-y-1">
+                <div className="text-amber-200 font-display">Belagerung</div>
+                <div>
+                  Fortschritt {Math.floor(siege.progress)}% · Moral {Math.floor(siege.morale)} · Vorrat{' '}
+                  {Math.floor(siege.foodLeft)}
+                </div>
+                {attackableArmies.map((army: Army) => (
+                  <div key={army.id} className="space-y-1 pt-1">
+                    <button
+                      disabled={loading}
+                      onClick={() =>
+                        handleAction(async () => {
+                          const res = await api.attack({
+                            armyId: army.id,
+                            targetProvinceId: province.id,
+                            storm: true,
+                          } as { armyId: string; targetProvinceId: string });
+                          return { gameState: res.gameState, result: res.result };
+                        })
+                      }
+                      className="btn-danger w-full text-sm"
+                    >
+                      ⚔️ Stürmen
+                    </button>
+                    <button
+                      disabled={loading}
+                      onClick={() => handleAction(() => api.abandonSiege({ siegeId: siege.id }))}
+                      className="btn-secondary w-full text-xs"
+                    >
+                      Belagerung abbrechen
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           {attackableArmies.map((army: Army) => (
             <div key={army.id} className="space-y-1">
-              <div className="text-xs text-gray-400">{army.name} {army.status === 'MARCHING' ? '(marschiert)' : ''}</div>
+              <div className="text-xs text-gray-400">
+                {army.name} {army.status === 'MARCHING' ? '(marschiert)' : ''}
+              </div>
               <button
                 disabled={loading || army.status === 'MARCHING'}
                 onClick={() =>
@@ -350,22 +392,31 @@ export default function ProvincePanel({
                 }
                 className="btn-secondary w-full text-sm"
               >
-                🚶 Marschieren (60s)
+                🚶 Marschieren
               </button>
-              <button
-                disabled={loading || army.status === 'MARCHING'}
-                onClick={() =>
-                  handleAction(async () => {
-                    const res = await api.attack({ armyId: army.id, targetProvinceId: province.id });
-                    return { gameState: res.gameState, result: res.result };
-                  })
-                }
-                className="btn-danger w-full text-sm"
-              >
-                ⚔️ Sofort angreifen
-              </button>
+              {!gameState.sieges?.some((s) => s.provinceId === province.id) && (
+                <button
+                  disabled={loading || army.status === 'MARCHING'}
+                  onClick={() =>
+                    handleAction(async () => {
+                      const res = await api.attack({ armyId: army.id, targetProvinceId: province.id });
+                      return { gameState: res.gameState, result: res.result };
+                    })
+                  }
+                  className="btn-danger w-full text-sm"
+                >
+                  {province.castle && province.castle.level >= 1
+                    ? '🏰 Belagerung beginnen'
+                    : '⚔️ Angreifen'}
+                </button>
+              )}
             </div>
           ))}
+          {province.ownerId && (
+            <p className="text-[10px] text-parchment/50">
+              Gegen KI-Reiche zuerst Krieg erklären (Diplomatie).
+            </p>
+          )}
         </div>
       )}
     </div>

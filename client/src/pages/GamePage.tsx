@@ -8,6 +8,7 @@ import ProvincePanel from '../components/ProvincePanel';
 import CharacterPanel from '../components/CharacterPanel';
 import CityView from '../components/CityView';
 import IntroOverlay from '../components/IntroOverlay';
+import EventModal from '../components/EventModal';
 import { buildIntroStory, INTRO_SEEN_KEY } from '../lore/intro';
 
 export default function GamePage() {
@@ -164,7 +165,12 @@ export default function GamePage() {
 
       {/* Ressourcen-HUD oben */}
       <div className="shrink-0 px-3 py-1.5 bg-black/40 border-b border-gold/20 flex flex-wrap items-center justify-between gap-2">
-        <div className="font-display text-sm text-gold truncate">{gameState.kingdom.name}</div>
+        <div className="font-display text-sm text-gold truncate">
+          {gameState.kingdom.name}
+          {gameState.worldYear ? (
+            <span className="text-parchment/50 font-sans text-[10px] ml-2">Anno {gameState.worldYear}</span>
+          ) : null}
+        </div>
         <ResourceBar resources={gameState.kingdom.resources} />
         <div className="flex gap-1">
           <button
@@ -186,6 +192,16 @@ export default function GamePage() {
           </button>
         </div>
       </div>
+
+      {gameState.worldAlert && (
+        <div className="shrink-0 px-3 py-1.5 bg-amber-950/50 border-b border-amber-600/40 text-amber-100 text-xs">
+          {gameState.worldAlert}
+        </div>
+      )}
+
+      {gameState.pendingEvents && gameState.pendingEvents.length > 0 && (
+        <EventModal gameState={gameState} onUpdate={handleUpdate} />
+      )}
 
       {/* Vollbild-Karte + Overlays */}
       <div className="flex-1 min-h-0 relative">
