@@ -26,38 +26,34 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="card w-full max-w-md space-y-6">
+    <div
+      className="min-h-dvh flex items-center justify-center p-4"
+      style={{
+        background:
+          'radial-gradient(ellipse at 50% 20%, #2a2218 0%, #0e0c0a 55%), linear-gradient(180deg, #1a2a1f 0%, #0e0c0a 100%)',
+      }}
+    >
+      <div className="panel w-full max-w-md p-6 space-y-5">
         <div className="text-center">
-          <img src={`${import.meta.env.BASE_URL}shield.svg`} alt="Wappen" className="w-16 h-16 mx-auto mb-3" />
-          <h1 className="text-2xl font-bold text-medieval-gold">Kronenchronik</h1>
-          <p className="text-gray-400 text-sm mt-1">Baue dein Königreich auf</p>
+          <img src={`${import.meta.env.BASE_URL}shield.svg`} alt="" className="w-14 h-14 mx-auto mb-3" />
+          <h1 className="font-display text-2xl text-gold">Kronenchronik</h1>
+          <p className="text-parchment/60 text-sm mt-1">Herrsche. Erobere. Überlebe.</p>
           {isOfflineMode && (
-            <p className="text-green-400/90 text-xs mt-2">
-              Spielstand wird automatisch in diesem Browser gespeichert
-            </p>
+            <p className="text-green-400/80 text-xs mt-2">Spielstand wird in diesem Browser gespeichert</p>
           )}
         </div>
 
         {error && (
-          <div className="bg-medieval-red/20 border border-medieval-red text-red-300 px-3 py-2 rounded text-sm">
-            {error}
-          </div>
+          <div className="bg-red-900/30 border border-red-700 text-red-200 px-3 py-2 rounded text-sm">{error}</div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-sm text-medieval-light mb-1">E-Mail</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="input-field"
-              required
-            />
+            <label className="block text-xs text-parchment/70 mb-1 font-display">E-Mail</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field" required />
           </div>
           <div>
-            <label className="block text-sm text-medieval-light mb-1">Passwort</label>
+            <label className="block text-xs text-parchment/70 mb-1 font-display">Passwort</label>
             <input
               type="password"
               value={password}
@@ -67,14 +63,14 @@ export default function LoginPage() {
             />
           </div>
           <button type="submit" disabled={loading} className="btn-primary w-full">
-            {loading ? 'Anmelden...' : 'Anmelden'}
+            {loading ? 'Anmelden…' : 'Anmelden'}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-400">
+        <p className="text-center text-sm text-parchment/50">
           Noch kein Konto?{' '}
-          <Link to="/register" className="text-medieval-gold hover:underline">
-            Registrieren
+          <Link to="/register" className="text-gold hover:underline">
+            Dynastie gründen
           </Link>
         </p>
       </div>

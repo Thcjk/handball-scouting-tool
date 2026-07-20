@@ -17,11 +17,11 @@ Mittelalter-Strategiespiel – **direkt im Browser**, ohne Server, ohne Installa
 
 ## Features
 
-- Weltkarte mit Zoom & Verschieben
-- Burgen, Städte, Gebäude, Armeen
+- **CK3-Stil-Weltkarte** mit Terrain, Flüssen, Reichsgrenzen (Zoom & Verschieben)
+- Charakter-Panel mit Porträt, Eigenschaften und Fähigkeiten
+- Burgen, Städte, Gebäude, Armeen auf der Karte
 - Schlachten & Provinzen erobern
-- Dynastien & Charaktere mit Eigenschaften
-- Automatisches Speichern nach jeder Aktion
+- Dynastien & automatisches Speichern
 
 ---
 

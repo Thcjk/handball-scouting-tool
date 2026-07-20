@@ -65,6 +65,8 @@ interface SaveProvince {
   x: number;
   y: number;
   terrain: string;
+  culture?: string;
+  religion?: string;
   population: number;
   prosperity: number;
   defense: number;
@@ -145,10 +147,13 @@ function storeSave(userId: string, save: GameSave) {
 }
 
 function createWorld(): SaveProvince[] {
-  const slugToId = new Map<string, string>();
-  for (const seed of WORLD_PROVINCES) {
-    slugToId.set(slugify(seed.name), slugify(seed.name));
-  }
+  const cultureByTerrain: Record<string, string> = {
+    PLAINS: 'germanisch',
+    FOREST: 'slawisch',
+    HILLS: 'frankisch',
+    MOUNTAINS: 'nordisch',
+    COAST: 'romanisch',
+  };
   return WORLD_PROVINCES.map((seed) => ({
     id: slugify(seed.name),
     slug: slugify(seed.name),
@@ -156,6 +161,8 @@ function createWorld(): SaveProvince[] {
     x: seed.x,
     y: seed.y,
     terrain: seed.terrain,
+    culture: cultureByTerrain[seed.terrain] ?? 'germanisch',
+    religion: 'lichtglaube',
     population: seed.population,
     prosperity: 50,
     defense: 10,
@@ -214,46 +221,70 @@ function createNewSave(kingdomName: string, rulerName: string): GameSave {
           id: rulerId,
           name: rulerName,
           age: 28,
+          gender: 'MALE',
+          traits: ['mutig', 'ehrgeizig'],
+          experience: 0,
+          health: 100,
+          prestige: 0,
           isAlive: true,
           isRuler: true,
           isHeir: false,
           martial: 10,
           diplomacy: 7,
           stewardship: 8,
+          intrigue: 5,
         },
         {
           id: heirId,
           name: `${rulerName} Jr.`,
           age: 8,
+          gender: 'MALE',
+          traits: ['loyal'],
+          experience: 0,
+          health: 100,
+          prestige: 0,
           isAlive: true,
           isRuler: false,
           isHeir: true,
           martial: 6,
           diplomacy: 5,
           stewardship: 5,
+          intrigue: 4,
         },
       ],
       ruler: {
         id: rulerId,
         name: rulerName,
         age: 28,
+        gender: 'MALE',
+        traits: ['mutig', 'ehrgeizig'],
+        experience: 0,
+        health: 100,
+        prestige: 0,
         isAlive: true,
         isRuler: true,
         isHeir: false,
         martial: 10,
         diplomacy: 7,
         stewardship: 8,
+        intrigue: 5,
       },
       heir: {
         id: heirId,
         name: `${rulerName} Jr.`,
         age: 8,
+        gender: 'MALE',
+        traits: ['loyal'],
+        experience: 0,
+        health: 100,
+        prestige: 0,
         isAlive: true,
         isRuler: false,
         isHeir: true,
         martial: 6,
         diplomacy: 5,
         stewardship: 5,
+        intrigue: 4,
       },
     },
     lastTickAt: Date.now(),
@@ -284,6 +315,8 @@ function toGameState(save: GameSave): GameState {
       x: p.x,
       y: p.y,
       terrain: p.terrain,
+      culture: p.culture,
+      religion: p.religion,
       population: p.population,
       prosperity: p.prosperity,
       defense: p.defense,

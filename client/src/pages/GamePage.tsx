@@ -14,6 +14,9 @@ export default function GamePage() {
   const [successionMsg, setSuccessionMsg] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [mapMode, setMapMode] = useState<'terrain' | 'political'>('political');
+  const [showChar, setShowChar] = useState(true);
+  const [showPanel, setShowPanel] = useState(true);
 
   const loadGame = useCallback(async () => {
     try {
@@ -34,7 +37,6 @@ export default function GamePage() {
     loadGame();
   }, [loadGame]);
 
-  // Offline: Ressourcen-Ticks alle 30 Sekunden
   useEffect(() => {
     if (!isOfflineMode) return;
     const id = setInterval(() => {
@@ -68,7 +70,7 @@ export default function GamePage() {
     onDiplomacyEvent: (data) => {
       const e = data as { type: string; from: string };
       if (e.type === 'war_declared') {
-        setSuccessionMsg(`⚠️ ${e.from} hat dir den Krieg erklärt!`);
+        setSuccessionMsg(`${e.from} hat dir den Krieg erklärt!`);
       }
     },
   });
@@ -76,6 +78,7 @@ export default function GamePage() {
   const handleSelect = (province: Province) => {
     setSelectedProvince(province);
     setBattleResult(null);
+    setShowPanel(true);
   };
 
   const handleUpdate = (state: GameState) => {
@@ -88,90 +91,116 @@ export default function GamePage() {
 
   if (loading) {
     return (
-      <div className="text-center text-medieval-gold animate-pulse py-20">Welt wird geladen...</div>
+      <div className="h-full flex items-center justify-center text-gold font-display animate-pulse">
+        Die Welt erwacht…
+      </div>
     );
   }
 
   if (error || !gameState) {
-    return <div className="text-center text-red-400 py-20">{error || 'Kein Spielstand'}</div>;
+    return <div className="h-full flex items-center justify-center text-red-400">{error || 'Kein Spielstand'}</div>;
   }
 
   return (
-    <div className="space-y-4">
-      <div className="card">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <h2 className="text-xl font-bold text-medieval-gold">{gameState.kingdom.name}</h2>
-          <ResourceBar resources={gameState.kingdom.resources} />
+    <div className="h-full flex flex-col relative">
+      {/* Ressourcen-HUD oben */}
+      <div className="shrink-0 px-3 py-1.5 bg-black/40 border-b border-gold/20 flex flex-wrap items-center justify-between gap-2">
+        <div className="font-display text-sm text-gold truncate">{gameState.kingdom.name}</div>
+        <ResourceBar resources={gameState.kingdom.resources} />
+        <div className="flex gap-1">
+          <button
+            type="button"
+            className={`btn-secondary text-[10px] py-1 ${mapMode === 'political' ? 'border-gold text-gold' : ''}`}
+            onClick={() => setMapMode('political')}
+          >
+            Reiche
+          </button>
+          <button
+            type="button"
+            className={`btn-secondary text-[10px] py-1 ${mapMode === 'terrain' ? 'border-gold text-gold' : ''}`}
+            onClick={() => setMapMode('terrain')}
+          >
+            Gelände
+          </button>
+          <button type="button" className="btn-secondary text-[10px] py-1" onClick={() => setShowChar((v) => !v)}>
+            Herrscher
+          </button>
         </div>
       </div>
 
-      {successionMsg && (
-        <div className="card border-2 border-medieval-gold">
-          <p className="text-medieval-gold">{successionMsg}</p>
-          <button onClick={() => setSuccessionMsg('')} className="btn-secondary text-xs mt-2">
-            Schließen
-          </button>
-        </div>
-      )}
+      {/* Vollbild-Karte + Overlays */}
+      <div className="flex-1 min-h-0 relative">
+        <WorldMap
+          provinces={gameState.provinces}
+          armies={gameState.armies}
+          selectedId={selectedProvince?.id ?? null}
+          onSelect={handleSelect}
+          mapMode={mapMode}
+        />
 
-      {battleResult && (
-        <div
-          className={`card border-2 ${battleResult.attackerWon ? 'border-medieval-gold' : 'border-medieval-red'}`}
-        >
-          <h3 className="font-bold text-lg mb-2">
-            {battleResult.attackerWon ? '⚔️ Sieg!' : '🛡️ Niederlage'}
-          </h3>
-          <p className="text-sm mb-2">{battleResult.summary}</p>
-          <div className="text-xs space-y-1 text-gray-400">
-            {battleResult.rounds.map((r) => (
-              <div key={r.round}>{r.description}</div>
-            ))}
+        {/* Charakter links (CK3-Stil) */}
+        {showChar && gameState.dynasty && (
+          <div className="absolute top-2 left-2 z-30 w-[min(100%-1rem,280px)] max-h-[calc(100%-1rem)] overflow-y-auto side-drawer">
+            <CharacterPanel dynasty={gameState.dynasty} compact onClose={() => setShowChar(false)} />
           </div>
-          <button onClick={() => setBattleResult(null)} className="btn-secondary text-xs mt-2">
-            Schließen
-          </button>
-        </div>
-      )}
+        )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 space-y-4">
-          <WorldMap
-            provinces={gameState.provinces}
-            armies={gameState.armies}
-            selectedId={selectedProvince?.id ?? null}
-            onSelect={handleSelect}
-          />
-          {gameState.dynasty && <CharacterPanel dynasty={gameState.dynasty} />}
-        </div>
-        <div>
-          {selectedProvince ? (
+        {/* Provinz rechts */}
+        {showPanel && selectedProvince && (
+          <div className="absolute top-2 right-2 z-30 w-[min(100%-1rem,320px)] max-h-[calc(100%-1rem)] overflow-y-auto side-drawer">
             <ProvincePanel
               province={selectedProvince}
               gameState={gameState}
               onUpdate={handleUpdate}
               onBattleResult={setBattleResult}
+              onClose={() => setShowPanel(false)}
             />
-          ) : (
-            <div className="card text-center text-gray-400 py-10">
-              Wähle eine Provinz auf der Karte
+          </div>
+        )}
+
+        {/* Events */}
+        {successionMsg && (
+          <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-40 panel p-3 max-w-sm text-center">
+            <p className="text-gold font-display text-sm">{successionMsg}</p>
+            <button onClick={() => setSuccessionMsg('')} className="btn-secondary text-xs mt-2">
+              Schließen
+            </button>
+          </div>
+        )}
+
+        {battleResult && (
+          <div
+            className={`absolute bottom-16 left-1/2 -translate-x-1/2 z-40 panel p-3 max-w-md w-[90%] border-2 ${battleResult.attackerWon ? 'border-gold' : 'border-blood'}`}
+            style={{ borderColor: battleResult.attackerWon ? 'var(--color-gold)' : 'var(--color-blood)' }}
+          >
+            <h3 className="font-display text-gold text-base mb-1">
+              {battleResult.attackerWon ? 'Sieg!' : 'Niederlage'}
+            </h3>
+            <p className="text-sm mb-2 text-parchment/90">{battleResult.summary}</p>
+            <div className="text-xs space-y-0.5 text-parchment/60 max-h-24 overflow-y-auto">
+              {battleResult.rounds.map((r) => (
+                <div key={r.round}>{r.description}</div>
+              ))}
             </div>
-          )}
-        </div>
+            <button onClick={() => setBattleResult(null)} className="btn-secondary text-xs mt-2">
+              Schließen
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* Untere Schlachten-Leiste */}
       {gameState.recentBattles.length > 0 && (
-        <div className="card">
-          <h3 className="font-bold text-medieval-gold mb-3">Letzte Schlachten</h3>
-          <div className="space-y-2">
-            {gameState.recentBattles.map((b) => (
-              <div key={b.id} className="text-sm bg-medieval-dark p-2 rounded flex justify-between">
-                <span>
-                  {b.attacker.name} vs {b.defender?.name ?? 'Neutral'} in {b.province.name}
-                </span>
-                <span className={b.attackerWon ? 'text-medieval-gold' : 'text-medieval-red'}>
+        <div className="shrink-0 border-t border-gold/20 bg-black/50 px-3 py-1.5 overflow-x-auto">
+          <div className="flex gap-3 text-[11px] whitespace-nowrap">
+            <span className="text-gold font-display">Schlachten:</span>
+            {gameState.recentBattles.slice(0, 5).map((b) => (
+              <span key={b.id} className="text-parchment/70">
+                {b.attacker.name} vs {b.defender?.name ?? 'Neutral'} ·{' '}
+                <span className={b.attackerWon ? 'text-gold' : 'text-red-400'}>
                   {b.attackerWon ? 'Sieg' : 'Niederlage'}
                 </span>
-              </div>
+              </span>
             ))}
           </div>
         </div>

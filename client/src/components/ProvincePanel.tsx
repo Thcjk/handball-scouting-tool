@@ -40,6 +40,7 @@ interface ProvincePanelProps {
   gameState: GameState;
   onUpdate: (state: GameState) => void;
   onBattleResult: (result: BattleResult) => void;
+  onClose?: () => void;
 }
 
 export default function ProvincePanel({
@@ -47,6 +48,7 @@ export default function ProvincePanel({
   gameState,
   onUpdate,
   onBattleResult,
+  onClose,
 }: ProvincePanelProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -81,33 +83,47 @@ export default function ProvincePanel({
   };
 
   return (
-    <div className="card space-y-4">
-      <div>
-        <h2 className="text-xl font-bold text-medieval-gold">{province.name}</h2>
-        <p className="text-sm text-gray-400">
-          {province.ownerName ? `Besitzer: ${province.ownerName}` : 'Neutral'} · Bevölkerung:{' '}
-          {province.population} · Verteidigung: {province.defense}
-        </p>
+    <div className="panel p-3 space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h2 className="font-display text-base text-gold">{province.name}</h2>
+          <p className="text-[11px] text-parchment/60 mt-0.5">
+            {province.ownerName ? province.ownerName : 'Neutral'}
+            {province.culture ? ` · ${province.culture}` : ''}
+            {province.religion ? ` · ${province.religion}` : ''}
+          </p>
+          <p className="text-[11px] text-parchment/50">
+            {province.population} Einwohner · Verteidigung {province.defense} · Wohlstand{' '}
+            {province.prosperity}
+          </p>
+        </div>
+        {onClose && (
+          <button type="button" onClick={onClose} className="btn-secondary text-[10px] py-0.5 px-1.5">
+            ✕
+          </button>
+        )}
       </div>
 
       {error && (
-        <div className="bg-medieval-red/20 border border-medieval-red text-red-300 px-3 py-2 rounded text-sm">
+        <div className="bg-red-900/30 border border-red-700 text-red-200 px-2 py-1.5 rounded text-xs">
           {error}
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-2 text-center text-sm">
-        <div className="bg-medieval-dark rounded p-2">
-          <div className="text-medieval-gold">🏰 Burg</div>
-          <div>Stufe {province.castle?.level ?? 0}</div>
+      <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
+        <div className="bg-black/40 rounded p-1.5 border border-gold/15">
+          <div className="text-parchment/50 text-[10px]">Burg</div>
+          <div className="text-gold font-display">{province.castle ? `St. ${province.castle.level}` : '–'}</div>
         </div>
-        <div className="bg-medieval-dark rounded p-2">
-          <div className="text-medieval-gold">🏘️ Dorf</div>
-          <div>Stufe {province.village?.level ?? 0}</div>
+        <div className="bg-black/40 rounded p-1.5 border border-gold/15">
+          <div className="text-parchment/50 text-[10px]">Dorf</div>
+          <div className="text-gold font-display">{province.village ? `St. ${province.village.level}` : '–'}</div>
         </div>
-        <div className="bg-medieval-dark rounded p-2">
-          <div className="text-medieval-gold">🏙️ Stadt</div>
-          <div>Stufe {province.city?.level ?? 0}</div>
+        <div className="bg-black/40 rounded p-1.5 border border-gold/15">
+          <div className="text-parchment/50 text-[10px]">Stadt</div>
+          <div className="text-gold font-display">
+            {province.city && province.city.level > 0 ? `St. ${province.city.level}` : '–'}
+          </div>
         </div>
       </div>
 

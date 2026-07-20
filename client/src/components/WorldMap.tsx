@@ -1,88 +1,73 @@
-import { useRef, useState, useCallback, useMemo } from 'react';
+import { useRef, useState, useMemo, useCallback } from 'react';
 import type { Province, Army } from '../api/client';
-
-const TILE_W = 120;
-const TILE_H = 90;
-const GAP = 8;
-
-const TERRAIN_FILL: Record<string, string> = {
-  PLAINS: '#2d5a27',
-  FOREST: '#1a3d1a',
-  HILLS: '#5c4a2a',
-  MOUNTAINS: '#4a4a4a',
-  COAST: '#1a3a5c',
-};
-
-const TERRAIN_LABELS: Record<string, string> = {
-  PLAINS: 'Ebene',
-  FOREST: 'Wald',
-  HILLS: 'Hügel',
-  MOUNTAINS: 'Berge',
-  COAST: 'Küste',
-};
-
-const OWNER_COLORS = [
-  '#d4af37',
-  '#c0392b',
-  '#2980b9',
-  '#8e44ad',
-  '#27ae60',
-  '#e67e22',
-  '#16a085',
-  '#e74c3c',
-];
-
-function ownerColor(ownerId: string | null, ownerIds: string[]): string {
-  if (!ownerId) return '#555';
-  const idx = ownerIds.indexOf(ownerId);
-  return OWNER_COLORS[idx % OWNER_COLORS.length];
-}
+import {
+  provincePolygon,
+  provinceCenter,
+  mapBounds,
+  TERRAIN_FILL,
+  REALM_COLORS,
+  RIVER_PATHS,
+} from '../map/geometry';
 
 interface WorldMapProps {
   provinces: Province[];
   armies: Army[];
   selectedId: string | null;
   onSelect: (province: Province) => void;
+  mapMode?: 'terrain' | 'political';
 }
 
-export default function WorldMap({ provinces, armies, selectedId, onSelect }: WorldMapProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const [transform, setTransform] = useState({ x: 20, y: 20, scale: 1 });
+export default function WorldMap({
+  provinces,
+  armies,
+  selectedId,
+  onSelect,
+  mapMode = 'political',
+}: WorldMapProps) {
+  const [transform, setTransform] = useState({ x: 10, y: 10, scale: 0.85 });
   const dragging = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
+  const moved = useRef(false);
+
+  const maxX = Math.max(...provinces.map((p) => p.x), 0);
+  const maxY = Math.max(...provinces.map((p) => p.y), 0);
+  const { width, height } = mapBounds(maxX, maxY);
 
   const ownerIds = useMemo(
     () => [...new Set(provinces.map((p) => p.ownerId).filter(Boolean))] as string[],
     [provinces],
   );
 
-  const provincePos = useCallback((p: Province) => ({
-    x: p.x * (TILE_W + GAP),
-    y: p.y * (TILE_H + GAP),
-  }), []);
-
-  const marchingArmies = armies.filter((a) => a.status === 'MARCHING');
+  const ownerColor = useCallback(
+    (ownerId: string | null) => {
+      if (!ownerId) return '#4a5560';
+      const idx = ownerIds.indexOf(ownerId);
+      return REALM_COLORS[idx % REALM_COLORS.length];
+    },
+    [ownerIds],
+  );
 
   const onWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     setTransform((t) => ({
       ...t,
-      scale: Math.min(3, Math.max(0.4, t.scale * delta)),
+      scale: Math.min(2.8, Math.max(0.35, t.scale * delta)),
     }));
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
-    if ((e.target as Element).closest('.province-tile')) return;
     dragging.current = true;
+    moved.current = false;
     lastPos.current = { x: e.clientX, y: e.clientY };
-    (e.target as Element).setPointerCapture?.(e.pointerId);
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
     if (!dragging.current) return;
     const dx = e.clientX - lastPos.current.x;
     const dy = e.clientY - lastPos.current.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) moved.current = true;
     lastPos.current = { x: e.clientX, y: e.clientY };
     setTransform((t) => ({ ...t, x: t.x + dx, y: t.y + dy }));
   };
@@ -91,118 +76,165 @@ export default function WorldMap({ provinces, armies, selectedId, onSelect }: Wo
     dragging.current = false;
   };
 
-  const resetView = () => setTransform({ x: 20, y: 20, scale: 1 });
+  const marchingArmies = armies.filter((a) => a.status === 'MARCHING');
 
   return (
-    <div className="card overflow-hidden">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-bold text-medieval-gold">Weltkarte</h2>
-        <div className="flex gap-2">
-          <button onClick={() => setTransform((t) => ({ ...t, scale: Math.min(3, t.scale * 1.2) }))} className="btn-secondary text-xs px-2 py-1">+</button>
-          <button onClick={() => setTransform((t) => ({ ...t, scale: Math.max(0.4, t.scale * 0.8) }))} className="btn-secondary text-xs px-2 py-1">−</button>
-          <button onClick={resetView} className="btn-secondary text-xs px-2 py-1">Zentrieren</button>
-        </div>
+    <div className="world-map-shell relative w-full h-full overflow-hidden">
+      {/* Steuerungsleiste */}
+      <div className="absolute top-2 right-2 z-20 flex gap-1">
+        <button
+          type="button"
+          className="map-ctrl"
+          onClick={() => setTransform((t) => ({ ...t, scale: Math.min(2.8, t.scale * 1.2) }))}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          className="map-ctrl"
+          onClick={() => setTransform((t) => ({ ...t, scale: Math.max(0.35, t.scale * 0.8) }))}
+        >
+          −
+        </button>
+        <button
+          type="button"
+          className="map-ctrl"
+          onClick={() => setTransform({ x: 10, y: 10, scale: 0.85 })}
+        >
+          ⌂
+        </button>
       </div>
 
-      <p className="text-xs text-gray-400 mb-2">Ziehen zum Verschieben · Mausrad zum Zoomen · Tippen zum Auswählen</p>
-
       <div
-        className="relative bg-medieval-dark rounded-lg overflow-hidden touch-none"
-        style={{ height: 'min(60vh, 500px)' }}
+        className="w-full h-full touch-none cursor-grab active:cursor-grabbing"
         onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerLeave={onPointerUp}
       >
-        <svg
-          ref={svgRef}
-          className="w-full h-full cursor-grab active:cursor-grabbing"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerLeave={onPointerUp}
-        >
-          <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
-            {/* Nachbarlinien */}
-            {provinces.map((p) =>
-              p.neighbors.map((n) => {
-                const a = provincePos(p);
-                const bProv = provinces.find((x) => x.id === n.id);
-                if (!bProv || p.id > n.id) return null;
-                const b = provincePos(bProv);
-                return (
-                  <line
-                    key={`${p.id}-${n.id}`}
-                    x1={a.x + TILE_W / 2}
-                    y1={a.y + TILE_H / 2}
-                    x2={b.x + TILE_W / 2}
-                    y2={b.y + TILE_H / 2}
-                    stroke="#444"
-                    strokeWidth={1}
-                    strokeDasharray="4 4"
-                    opacity={0.4}
-                  />
-                );
-              }),
-            )}
+        <svg className="w-full h-full" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <radialGradient id="mapBg" cx="50%" cy="40%" r="70%">
+              <stop offset="0%" stopColor="#1a2a1f" />
+              <stop offset="100%" stopColor="#0c1210" />
+            </radialGradient>
+            <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.45" />
+            </filter>
+            <pattern id="forestDots" width="8" height="8" patternUnits="userSpaceOnUse">
+              <circle cx="2" cy="2" r="1.2" fill="#0f2a18" opacity="0.5" />
+              <circle cx="6" cy="5" r="1" fill="#0f2a18" opacity="0.35" />
+            </pattern>
+            <pattern id="mountainHatch" width="6" height="6" patternUnits="userSpaceOnUse">
+              <path d="M0 6 L6 0" stroke="#3a3a3a" strokeWidth="0.8" opacity="0.4" />
+            </pattern>
+          </defs>
 
-            {provinces.map((province) => {
-              const { x, y } = provincePos(province);
-              const borderColor = province.isOwned
-                ? '#d4af37'
-                : ownerColor(province.ownerId, ownerIds);
-              const isSelected = selectedId === province.id;
-              const fieldArmies = province.armies?.filter((a) => !a.isGarrison) ?? [];
-              const totalTroops = fieldArmies.reduce(
-                (s, a) => s + (a.units?.reduce((u, unit) => u + unit.count, 0) ?? 0),
-                0,
-              );
+          <rect width={width} height={height} fill="url(#mapBg)" />
+
+          <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
+            {/* Flüsse */}
+            {RIVER_PATHS.map((d, i) => (
+              <path
+                key={i}
+                d={d}
+                fill="none"
+                stroke="#3a7a9a"
+                strokeWidth={4}
+                strokeOpacity={0.55}
+                strokeLinecap="round"
+              />
+            ))}
+
+            {/* Provinzen */}
+            {provinces.map((p) => {
+              const poly = provincePolygon(p.x, p.y, p.name);
+              const { cx, cy } = provinceCenter(p.x, p.y);
+              const isSelected = selectedId === p.id;
+              const fill =
+                mapMode === 'political' && p.ownerId
+                  ? ownerColor(p.ownerId)
+                  : TERRAIN_FILL[p.terrain] ?? '#445';
+              const border = p.isOwned
+                ? '#f0d060'
+                : p.ownerId
+                  ? ownerColor(p.ownerId)
+                  : '#2a3035';
+
+              const fieldTroops = (p.armies ?? [])
+                .filter((a) => !a.isGarrison)
+                .reduce((s, a) => s + (a.units?.reduce((u, unit) => u + unit.count, 0) ?? 0), 0);
 
               return (
                 <g
-                  key={province.id}
-                  className="province-tile cursor-pointer"
-                  onClick={() => onSelect(province)}
+                  key={p.id}
+                  className="province-poly"
+                  onClick={() => {
+                    if (!moved.current) onSelect(p);
+                  }}
+                  style={{ cursor: 'pointer' }}
                 >
-                  <rect
-                    x={x}
-                    y={y}
-                    width={TILE_W}
-                    height={TILE_H}
-                    rx={6}
-                    fill={TERRAIN_FILL[province.terrain] ?? '#333'}
-                    stroke={isSelected ? '#d4af37' : borderColor}
-                    strokeWidth={isSelected ? 3 : 2}
-                    opacity={0.9}
+                  <polygon
+                    points={poly}
+                    fill={fill}
+                    fillOpacity={mapMode === 'political' && p.ownerId ? 0.72 : 0.88}
+                    stroke={isSelected ? '#f5e6a3' : border}
+                    strokeWidth={isSelected ? 3.5 : p.isOwned ? 2.5 : 1.2}
+                    filter={isSelected ? 'url(#softShadow)' : undefined}
                   />
-                  <text x={x + 8} y={y + 18} fill="#fff" fontSize={11} fontWeight="bold">
-                    {province.name.length > 14 ? province.name.slice(0, 12) + '…' : province.name}
+                  {p.terrain === 'FOREST' && (
+                    <polygon points={poly} fill="url(#forestDots)" opacity={0.6} pointerEvents="none" />
+                  )}
+                  {p.terrain === 'MOUNTAINS' && (
+                    <polygon points={poly} fill="url(#mountainHatch)" opacity={0.5} pointerEvents="none" />
+                  )}
+
+                  {/* Siedlungs-Icon */}
+                  {p.castle && (
+                    <text x={cx} y={cy - 14} textAnchor="middle" fontSize={14} className="map-icon">
+                      🏰
+                    </text>
+                  )}
+                  {p.city && p.city.level > 0 && !p.castle && (
+                    <text x={cx} y={cy - 14} textAnchor="middle" fontSize={12} className="map-icon">
+                      🏙️
+                    </text>
+                  )}
+
+                  {/* Name */}
+                  <text
+                    x={cx}
+                    y={cy + (p.castle || (p.city && p.city.level > 0) ? 6 : 0)}
+                    textAnchor="middle"
+                    className="map-label"
+                    fontSize={p.isOwned || isSelected ? 11 : 9}
+                    fontWeight={p.isOwned ? 700 : 500}
+                    fill={isSelected ? '#fff8d0' : '#f0ead8'}
+                    style={{ paintOrder: 'stroke', stroke: '#1a1208', strokeWidth: 2.5 }}
+                  >
+                    {p.name.length > 12 ? p.name.slice(0, 11) + '…' : p.name}
                   </text>
-                  <text x={x + 8} y={y + 32} fill="#aaa" fontSize={9}>
-                    {TERRAIN_LABELS[province.terrain]}
-                  </text>
-                  {province.castle && (
-                    <text x={x + 8} y={y + 46} fill="#d4af37" fontSize={9}>
-                      🏰 Burg St.{province.castle.level}
+
+                  {p.ownerName && (
+                    <text
+                      x={cx}
+                      y={cy + 16}
+                      textAnchor="middle"
+                      fontSize={7}
+                      fill="#d4c4a0"
+                      style={{ paintOrder: 'stroke', stroke: '#1a1208', strokeWidth: 1.5 }}
+                    >
+                      {p.ownerName.length > 14 ? p.ownerName.slice(0, 13) + '…' : p.ownerName}
                     </text>
                   )}
-                  {province.city && province.city.level > 0 && (
-                    <text x={x + 8} y={y + 58} fill="#87ceeb" fontSize={9}>
-                      🏙️ Stadt St.{province.city.level}
-                    </text>
-                  )}
-                  {province.ownerName && (
-                    <text x={x + 8} y={y + TILE_H - 10} fill="#ccc" fontSize={8}>
-                      {province.ownerName}
-                    </text>
-                  )}
-                  {!province.ownerId && (
-                    <text x={x + 8} y={y + TILE_H - 10} fill="#888" fontSize={8}>
-                      Neutral
-                    </text>
-                  )}
-                  {totalTroops > 0 && (
+
+                  {/* Armee-Marker */}
+                  {fieldTroops > 0 && (
                     <g>
-                      <circle cx={x + TILE_W - 16} cy={y + 16} r={12} fill="#8b0000" opacity={0.9} />
-                      <text x={x + TILE_W - 16} y={y + 20} fill="#fff" fontSize={9} textAnchor="middle">
-                        ⚔{totalTroops}
+                      <circle cx={cx + 38} cy={cy - 22} r={11} fill="#6b1515" stroke="#d4af37" strokeWidth={1.5} />
+                      <text x={cx + 38} y={cy - 18} textAnchor="middle" fontSize={8} fill="#fff" fontWeight="bold">
+                        {fieldTroops}
                       </text>
                     </g>
                   )}
@@ -215,23 +247,24 @@ export default function WorldMap({ provinces, armies, selectedId, onSelect }: Wo
               const from = provinces.find((p) => p.id === army.provinceId);
               const to = provinces.find((p) => p.id === army.targetProvinceId);
               if (!from || !to) return null;
-              const a = provincePos(from);
-              const b = provincePos(to);
-              const mx = (a.x + b.x) / 2 + TILE_W / 2;
-              const my = (a.y + b.y) / 2 + TILE_H / 2;
+              const a = provinceCenter(from.x, from.y);
+              const b = provinceCenter(to.x, to.y);
+              const mx = (a.cx + b.cx) / 2;
+              const my = (a.cy + b.cy) / 2;
               return (
                 <g key={army.id}>
                   <line
-                    x1={a.x + TILE_W / 2}
-                    y1={a.y + TILE_H / 2}
-                    x2={b.x + TILE_W / 2}
-                    y2={b.y + TILE_H / 2}
+                    x1={a.cx}
+                    y1={a.cy}
+                    x2={b.cx}
+                    y2={b.cy}
                     stroke="#d4af37"
-                    strokeWidth={2}
-                    strokeDasharray="6 4"
+                    strokeWidth={2.5}
+                    strokeDasharray="8 5"
+                    opacity={0.9}
                   />
-                  <circle cx={mx} cy={my} r={10} fill="#d4af37" />
-                  <text x={mx} y={my + 4} fill="#1a1a1a" fontSize={10} textAnchor="middle">
+                  <circle cx={mx} cy={my} r={12} fill="#d4af37" stroke="#1a1208" strokeWidth={1} />
+                  <text x={mx} y={my + 4} textAnchor="middle" fontSize={11} fill="#1a1208" fontWeight="bold">
                     →
                   </text>
                 </g>
@@ -241,12 +274,16 @@ export default function WorldMap({ provinces, armies, selectedId, onSelect }: Wo
         </svg>
       </div>
 
-      <div className="flex flex-wrap gap-3 mt-3 text-xs text-gray-400">
+      {/* Legende */}
+      <div className="absolute bottom-2 left-2 z-20 flex flex-wrap gap-2 max-w-[70%] pointer-events-none">
         {ownerIds.map((id, i) => {
           const name = provinces.find((p) => p.ownerId === id)?.ownerName ?? 'Reich';
           return (
-            <span key={id} className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded inline-block" style={{ background: OWNER_COLORS[i % OWNER_COLORS.length] }} />
+            <span
+              key={id}
+              className="text-[10px] px-2 py-0.5 rounded bg-black/55 text-parchment border border-gold/30 flex items-center gap-1"
+            >
+              <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: REALM_COLORS[i % REALM_COLORS.length] }} />
               {name}
             </span>
           );

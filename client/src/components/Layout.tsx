@@ -1,36 +1,38 @@
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { isOfflineMode } from '../api/client';
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const location = useLocation();
+  const isGame = location.pathname === '/game' || location.pathname.endsWith('/game');
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="bg-medieval-gray border-b border-medieval-brown/50 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src={`${import.meta.env.BASE_URL}shield.svg`} alt="Wappen" className="w-8 h-8" />
-            <h1 className="text-xl font-bold text-medieval-gold">Kronenchronik</h1>
+    <div className={`min-h-dvh flex flex-col ${isGame ? 'h-dvh overflow-hidden' : ''}`}>
+      <header className="hud-bar px-3 py-2 z-40 shrink-0">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <img src={`${import.meta.env.BASE_URL}shield.svg`} alt="" className="w-7 h-7 shrink-0" />
+            <h1 className="font-display text-base sm:text-lg text-gold truncate">Kronenchronik</h1>
             {isOfflineMode && (
-              <span className="text-xs text-green-400 hidden sm:inline" title="Fortschritt wird automatisch im Browser gespeichert">
-                Gespeichert im Browser
+              <span className="hidden md:inline text-[10px] text-green-400/90 border border-green-500/30 px-1.5 py-0.5 rounded">
+                Gespeichert
               </span>
             )}
           </div>
-          <nav className="flex items-center gap-2 sm:gap-4 flex-wrap">
+          <nav className="flex items-center gap-1 sm:gap-2 shrink-0">
             <NavLink
               to="/game"
               className={({ isActive }) =>
-                `px-3 py-1 rounded transition-colors text-sm ${isActive ? 'text-medieval-gold bg-medieval-brown/30' : 'text-gray-300 hover:text-medieval-gold'}`
+                `px-2 py-1 text-xs sm:text-sm font-display transition-colors ${isActive ? 'text-gold' : 'text-parchment/70 hover:text-gold'}`
               }
             >
-              Weltkarte
+              Karte
             </NavLink>
             <NavLink
               to="/diplomacy"
               className={({ isActive }) =>
-                `px-3 py-1 rounded transition-colors text-sm ${isActive ? 'text-medieval-gold bg-medieval-brown/30' : 'text-gray-300 hover:text-medieval-gold'}`
+                `px-2 py-1 text-xs sm:text-sm font-display transition-colors ${isActive ? 'text-gold' : 'text-parchment/70 hover:text-gold'}`
               }
             >
               Diplomatie
@@ -38,19 +40,19 @@ export default function Layout() {
             <NavLink
               to="/profile"
               className={({ isActive }) =>
-                `px-3 py-1 rounded transition-colors text-sm ${isActive ? 'text-medieval-gold bg-medieval-brown/30' : 'text-gray-300 hover:text-medieval-gold'}`
+                `px-2 py-1 text-xs sm:text-sm font-display transition-colors ${isActive ? 'text-gold' : 'text-parchment/70 hover:text-gold'}`
               }
             >
               Profil
             </NavLink>
-            <span className="text-medieval-light text-sm hidden sm:inline">{user?.username}</span>
-            <button onClick={logout} className="btn-secondary text-sm">
+            <span className="hidden sm:inline text-xs text-parchment/50 mx-1">{user?.username}</span>
+            <button onClick={logout} className="btn-secondary text-[11px] py-1 px-2">
               Abmelden
             </button>
           </nav>
         </div>
       </header>
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4">
+      <main className={`flex-1 min-h-0 ${isGame ? '' : 'max-w-5xl w-full mx-auto p-4'}`}>
         <Outlet />
       </main>
     </div>
