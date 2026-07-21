@@ -798,6 +798,20 @@ function toGameState(save: GameSave): GameState {
       rulerName: k.ruler.name,
       rulerAge: k.ruler.age,
     })),
+    diplomacyBrief: (save.aiKingdoms ?? []).map((k) => {
+      const rel = ensureRelation(save.relations ?? [], kid, k.id);
+      const atWar = areAtWar(save.wars ?? [], kid, k.id);
+      return {
+        kingdomId: k.id,
+        kingdomName: k.name,
+        rulerName: k.ruler.name,
+        opinion: rel.opinion,
+        status: atWar ? 'AT_WAR' : rel.status,
+        label: relationLabel(rel.opinion, atWar),
+        atWar,
+        lastReason: rel.lastReason,
+      };
+    }),
     wars: save.wars ?? [],
     sieges: (save.sieges ?? []).map((s) => ({
       ...s,

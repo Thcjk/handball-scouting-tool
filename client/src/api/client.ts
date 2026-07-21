@@ -453,6 +453,17 @@ export interface GameState {
     rulerName: string;
     rulerAge: number;
   }>;
+  /** Kurzinfo Diplomatie zu KI-Reichen (Anzeige auf der Karte) */
+  diplomacyBrief?: Array<{
+    kingdomId: string;
+    kingdomName: string;
+    rulerName: string;
+    opinion: number;
+    status: string;
+    label: string;
+    atWar: boolean;
+    lastReason?: string;
+  }>;
   wars?: Array<{
     id: string;
     attackerId: string;

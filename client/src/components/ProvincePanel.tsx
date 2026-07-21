@@ -60,11 +60,44 @@ export default function ProvincePanel({
   const [recruitCount, setRecruitCount] = useState(5);
   const [armyName, setArmyName] = useState('Feldarmee');
 
-  const isOwned = province.isOwned;
+  const isOwned = Boolean(province.isOwned && province.ownerId === gameState.kingdom.id);
   const attackableArmies = gameState.armies.filter((a) => !a.isGarrison);
   const isNeighbor = gameState.provinces
     .filter((p) => p.isOwned)
     .some((owned) => owned.neighbors.some((n) => n.id === province.id));
+
+  const foreignRealm = useMemo(() => {
+    if (isOwned || !province.ownerId) return null;
+    const ai = gameState.aiKingdoms?.find((k) => k.id === province.ownerId);
+    const brief = gameState.diplomacyBrief?.find((d) => d.kingdomId === province.ownerId);
+    const war = gameState.wars?.find(
+      (w) =>
+        (w.attackerId === gameState.kingdom.id && w.defenderId === province.ownerId) ||
+        (w.defenderId === gameState.kingdom.id && w.attackerId === province.ownerId),
+    );
+    return {
+      name: ai?.name ?? province.ownerName ?? 'Fremdes Reich',
+      rulerName: ai?.rulerName ?? brief?.rulerName ?? 'Unbekannter Herrscher',
+      rulerAge: ai?.rulerAge,
+      personality: ai?.personalityLabel ?? ai?.personality,
+      culture: ai?.culture ?? province.culture,
+      religion: ai?.religion ?? province.religion,
+      provinceCount: ai?.provinceCount,
+      opinion: brief?.opinion ?? 0,
+      status: brief?.status ?? (war ? 'AT_WAR' : 'NEUTRAL'),
+      label: brief?.label ?? (war ? 'Im Krieg' : 'Neutral'),
+      atWar: Boolean(brief?.atWar || war),
+      warText: war?.reasonText,
+      lastReason: brief?.lastReason,
+    };
+  }, [isOwned, province, gameState]);
+
+  const relationTone =
+    foreignRealm?.atWar || (foreignRealm?.opinion ?? 0) < -25
+      ? 'bad'
+      : (foreignRealm?.opinion ?? 0) >= 30
+        ? 'good'
+        : 'warn';
 
   const infoCards = useMemo(() => {
     const tiles = (province.cityGrid ?? []).map((t) => ({
@@ -184,7 +217,11 @@ export default function ProvincePanel({
         <div>
           <h2 className="font-display text-base text-gold">{province.name}</h2>
           <p className="text-[11px] text-parchment/60 mt-0.5">
-            {province.ownerName ? province.ownerName : 'Neutral'}
+            {isOwned
+              ? `Dein Reich · ${gameState.kingdom.name}`
+              : province.ownerName
+                ? province.ownerName
+                : 'Herrenlos / Neutral'}
             {province.culture ? ` · ${province.culture}` : ''}
             {province.religion ? ` · ${province.religion}` : ''}
           </p>
@@ -203,6 +240,105 @@ export default function ProvincePanel({
       {error && (
         <div className="bg-red-900/30 border border-red-700 text-red-200 px-2 py-1.5 rounded text-xs">
           {error}
+        </div>
+      )}
+
+      {/* Fremdes Reich: Herrscher & Diplomatie */}
+      {!isOwned && (
+        <div className="space-y-2 border border-gold/25 rounded p-2.5 bg-black/35">
+          {foreignRealm ? (
+            <>
+              <div className="font-display text-sm text-gold">{foreignRealm.name}</div>
+              <div className="text-[11px] text-parchment/80">
+                Herrscher: <span className="text-parchment">{foreignRealm.rulerName}</span>
+                {foreignRealm.rulerAge != null ? ` (${foreignRealm.rulerAge} Jahre)` : ''}
+              </div>
+              {foreignRealm.personality && (
+                <div className="text-[10px] text-parchment/55">Charakter: {foreignRealm.personality}</div>
+              )}
+              <div className="text-[10px] text-parchment/55">
+                {[foreignRealm.culture, foreignRealm.religion, foreignRealm.provinceCount != null ? `${foreignRealm.provinceCount} Provinzen` : null]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
+              <div className={toneClass(relationTone as 'good' | 'warn' | 'bad')}>
+                <div className="info-card-label">Beziehung zu dir</div>
+                <div className="info-card-value">
+                  {foreignRealm.label}
+                  <span className="text-[10px] ml-1 opacity-80">({foreignRealm.opinion})</span>
+                </div>
+              </div>
+              {foreignRealm.atWar && (
+                <div className="text-[11px] text-red-200 bg-red-950/40 border border-red-800/50 rounded px-2 py-1.5">
+                  ⚔ Im Krieg
+                  {foreignRealm.warText ? ` – ${foreignRealm.warText}` : ''}
+                </div>
+              )}
+              {!foreignRealm.atWar && foreignRealm.lastReason && (
+                <div className="text-[10px] text-parchment/50">Anlass: {foreignRealm.lastReason}</div>
+              )}
+              <div className="flex flex-wrap gap-1 pt-1">
+                {!foreignRealm.atWar && province.ownerId && (
+                  <button
+                    type="button"
+                    disabled={loading}
+                    className="btn-danger text-[10px] py-1"
+                    onClick={() =>
+                      handleAction(async () => {
+                        await api.declareWar(province.ownerId!);
+                        return api.getGameState();
+                      })
+                    }
+                  >
+                    Krieg erklären
+                  </button>
+                )}
+                {foreignRealm.atWar && province.ownerId && (
+                  <button
+                    type="button"
+                    disabled={loading}
+                    className="btn-secondary text-[10px] py-1"
+                    onClick={() =>
+                      handleAction(async () => {
+                        await api.makePeace(province.ownerId!);
+                        return api.getGameState();
+                      })
+                    }
+                  >
+                    Frieden anbieten
+                  </button>
+                )}
+                {!foreignRealm.atWar && province.ownerId && (foreignRealm.opinion ?? 0) >= -10 && (
+                  <button
+                    type="button"
+                    disabled={loading}
+                    className="btn-secondary text-[10px] py-1"
+                    onClick={() =>
+                      handleAction(async () => {
+                        await api.proposeTrade(province.ownerId!);
+                        return api.getGameState();
+                      })
+                    }
+                  >
+                    Handel vorschlagen
+                  </button>
+                )}
+              </div>
+              <p className="text-[10px] text-amber-200/90 border-t border-gold/15 pt-2">
+                🏰 Stadt betreten erst nach Eroberung – erobere die Provinz im Krieg.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="font-display text-sm text-gold">Neutrales Land</div>
+              <p className="text-[11px] text-parchment/70">
+                Kein Herrscher. Mit einer Armee angreifbar, wenn du angrenzt.
+              </p>
+              <p className="text-[10px] text-amber-200/90">
+                Stadtverwaltung erst nach Eroberung möglich.
+              </p>
+            </>
+          )}
         </div>
       )}
 
@@ -234,7 +370,8 @@ export default function ProvincePanel({
         </div>
       )}
 
-      {province.buildings.length > 0 && (
+      {/* Gebäude/Truppen: bei Fremden nur grob */}
+      {isOwned && province.buildings.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-medieval-light mb-1">Gebäude</h3>
           <div className="flex flex-wrap gap-1">
@@ -247,7 +384,20 @@ export default function ProvincePanel({
         </div>
       )}
 
-      {province.armies.length > 0 && (
+      {!isOwned && (province.buildings.length > 0 || province.castle || province.city) && (
+        <div className="text-[11px] text-parchment/55">
+          Sichtbare Befestigung:{' '}
+          {[
+            province.castle ? `Burg St.${province.castle.level}` : null,
+            province.city && province.city.level > 0 ? `Stadt St.${province.city.level}` : null,
+            province.buildings.length ? `${province.buildings.length} Gebäude` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ') || 'unbekannt'}
+        </div>
+      )}
+
+      {isOwned && province.armies.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-medieval-light mb-1">Truppen</h3>
           {province.armies.map((army) => (
@@ -517,9 +667,14 @@ export default function ProvincePanel({
               )}
             </div>
           ))}
-          {province.ownerId && (
+          {province.ownerId && !foreignRealm?.atWar && (
             <p className="text-[10px] text-parchment/50">
-              Gegen KI-Reiche zuerst Krieg erklären (Diplomatie).
+              Gegen fremde Reiche zuerst Krieg erklären (oben oder unter Diplomatie).
+            </p>
+          )}
+          {foreignRealm?.atWar && (
+            <p className="text-[10px] text-amber-200/80">
+              Krieg aktiv – erobere die Provinz, dann kannst du die Stadt verwalten.
             </p>
           )}
         </div>

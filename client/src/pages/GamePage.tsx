@@ -175,7 +175,7 @@ export default function GamePage() {
     ? gameState.provinces.find((p) => p.id === cityViewId)
     : null;
 
-  if (cityProvince && cityProvince.isOwned) {
+  if (cityProvince && cityProvince.isOwned && cityProvince.ownerId === gameState.kingdom.id) {
     return (
       <div className="h-full max-h-full flex flex-col overflow-hidden">
         <div className="shrink-0 px-3 py-1.5 bg-black/40 border-b border-gold/20 flex flex-wrap items-center justify-between gap-2">
@@ -309,7 +309,11 @@ export default function GamePage() {
               onUpdate={handleUpdate}
               onBattleResult={setBattleResult}
               onClose={() => setShowPanel(false)}
-              onEnterCity={() => setCityViewId(selectedProvince.id)}
+              onEnterCity={
+                selectedProvince.isOwned && selectedProvince.ownerId === gameState.kingdom.id
+                  ? () => setCityViewId(selectedProvince.id)
+                  : undefined
+              }
             />
           </div>
         )}
