@@ -177,12 +177,12 @@ export default function GamePage() {
 
   if (cityProvince && cityProvince.isOwned) {
     return (
-      <div className="h-full flex flex-col">
+      <div className="h-full max-h-full flex flex-col overflow-hidden">
         <div className="shrink-0 px-3 py-1.5 bg-black/40 border-b border-gold/20 flex flex-wrap items-center justify-between gap-2">
           <div className="font-display text-sm text-gold truncate">{gameState.kingdom.name}</div>
           <ResourceBar resources={gameState.kingdom.resources} flow={resourceFlow} />
         </div>
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-hidden">
           <CityView
             province={cityProvince}
             gameState={gameState}
@@ -195,7 +195,7 @@ export default function GamePage() {
   }
 
   return (
-    <div className="h-full flex flex-col relative">
+    <div className="h-full max-h-full flex flex-col relative overflow-hidden">
       {showIntro && gameState && (
         <IntroOverlay
           rulerName={gameState.dynasty.ruler?.name ?? 'Herrscher'}

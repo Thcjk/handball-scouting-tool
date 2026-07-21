@@ -1,15 +1,75 @@
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { isOfflineMode } from '../api/client';
+import { useFullscreen } from '../hooks/useFullscreen';
 
 export default function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const isGame = location.pathname === '/game' || location.pathname.endsWith('/game');
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  const { active: browserFs, enter, exit } = useFullscreen(shellRef);
+  const [immersive, setImmersive] = useState(false);
+
+  // Spielseite: immer ohne Seitenscroll (Viewport füllen)
+  useEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+    if (isGame) {
+      root.classList.add('app-no-scroll');
+      body.classList.add('app-no-scroll');
+    } else {
+      root.classList.remove('app-no-scroll');
+      body.classList.remove('app-no-scroll');
+      setImmersive(false);
+      if (browserFs) void exit();
+    }
+    return () => {
+      root.classList.remove('app-no-scroll');
+      body.classList.remove('app-no-scroll');
+    };
+  }, [isGame, browserFs, exit]);
+
+  const leaveFullscreen = useCallback(() => {
+    setImmersive(false);
+    void exit();
+  }, [exit]);
+
+  // ESC beendet Vollbild
+  useEffect(() => {
+    if (!isGame) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (document.fullscreenElement || immersive) {
+        e.preventDefault();
+        leaveFullscreen();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isGame, immersive, leaveFullscreen]);
+
+  // Browser-Fullscreen-Ende → immersiv aus
+  useEffect(() => {
+    if (!browserFs) setImmersive(false);
+  }, [browserFs]);
+
+  const goFullscreen = async () => {
+    setImmersive(true);
+    await enter();
+  };
+
+  const hideChrome = isGame && (immersive || browserFs);
 
   return (
-    <div className={`min-h-dvh flex flex-col ${isGame ? 'h-dvh overflow-hidden' : ''}`}>
-      <header className="hud-bar px-3 py-2 z-40 shrink-0">
+    <div
+      ref={shellRef}
+      className={`app-shell flex flex-col ${isGame ? 'app-shell-game' : 'app-shell-pages'} ${
+        hideChrome ? 'is-fullscreen' : ''
+      } ${browserFs ? 'is-browser-fs' : ''}`}
+    >
+      <header className={`hud-bar px-3 py-2 z-40 shrink-0 ${hideChrome ? 'app-chrome-hidden' : ''}`}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <img src={`${import.meta.env.BASE_URL}shield.svg`} alt="" className="w-7 h-7 shrink-0" />
@@ -85,6 +145,16 @@ export default function Layout() {
             >
               Profil
             </NavLink>
+            {isGame && (
+              <button
+                type="button"
+                className="btn-secondary text-[11px] py-1 px-2"
+                title={browserFs ? 'Vollbild beenden (Esc)' : 'Vollbild'}
+                onClick={() => void (browserFs ? leaveFullscreen() : goFullscreen())}
+              >
+                {browserFs ? '🡽 Esc' : '⛶ Vollbild'}
+              </button>
+            )}
             <span className="hidden sm:inline text-xs text-parchment/50 mx-1">{user?.username}</span>
             <button onClick={logout} className="btn-secondary text-[11px] py-1 px-2">
               Abmelden
@@ -92,7 +162,32 @@ export default function Layout() {
           </nav>
         </div>
       </header>
-      <main className={`flex-1 min-h-0 ${isGame ? '' : 'max-w-5xl w-full mx-auto p-4'}`}>
+
+      {isGame && hideChrome && (
+        <button
+          type="button"
+          className="fs-exit-hint"
+          title="Vollbild beenden"
+          onClick={leaveFullscreen}
+        >
+          Esc · Verlassen
+        </button>
+      )}
+
+      {isGame && !hideChrome && (
+        <div className="shrink-0 px-3 py-1 bg-black/50 border-b border-gold/20 flex items-center justify-between gap-2 text-[11px] text-parchment/70">
+          <span>Die Karte füllt den Bildschirm – ohne Scrollen.</span>
+          <button type="button" className="btn-secondary text-[10px] py-0.5 px-2" onClick={() => void goFullscreen()}>
+            ⛶ Vollbild · Esc zum Verlassen
+          </button>
+        </div>
+      )}
+
+      <main
+        className={`flex-1 min-h-0 ${
+          isGame ? 'overflow-hidden' : 'overflow-y-auto max-w-5xl w-full mx-auto p-4'
+        }`}
+      >
         <Outlet />
       </main>
     </div>

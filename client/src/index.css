@@ -27,8 +27,14 @@
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
+  width: 100%;
+  height: 100%;
+}
+
+body {
   background: var(--color-ink);
   color: var(--color-parchment);
   font-family: var(--font-body);
@@ -36,8 +42,74 @@ body {
   overflow-x: hidden;
 }
 
+html.app-no-scroll,
+html.app-no-scroll body,
+body.app-no-scroll {
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
 #root {
   min-height: 100dvh;
+  height: 100%;
+}
+
+html.app-no-scroll #root,
+body.app-no-scroll #root {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.app-shell {
+  width: 100%;
+  min-height: 100dvh;
+}
+
+.app-shell-game {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.app-shell-pages {
+  min-height: 100dvh;
+}
+
+.app-chrome-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  pointer-events: none;
+}
+
+.fs-exit-hint {
+  position: fixed;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 60;
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  padding: 0.35rem 0.65rem;
+  color: var(--color-gold);
+  background: rgba(20, 16, 12, 0.82);
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.15s;
+}
+.fs-exit-hint:hover {
+  opacity: 1;
 }
 
 h1,
